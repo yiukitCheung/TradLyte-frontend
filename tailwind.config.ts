@@ -14,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Poppins', 'system-ui', 'sans-serif'],
-        display: ['Pacifico', 'cursive'],
+        sans: ['Montserrat', 'system-ui', 'sans-serif'],
+        display: ['Lora', 'serif'],
       },
       colors: {
         border: "hsl(var(--border))",
