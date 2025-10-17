@@ -65,48 +65,80 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Mission & Values Section */}
+      {/* Mission, Vision & Values Section */}
       <section className="py-24 bg-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16 space-y-4">
+          <div className="max-w-6xl mx-auto space-y-20">
+            {/* Mission */}
+            <div className="text-center space-y-4">
               <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground">
                 Our Mission
               </h2>
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                Empowering individuals to take control of their financial future through intelligent, data-driven insights.
+                To liberate people from endlessly hunting money and resources — and guide them to discover meaning, direction, and peace through purposeful investing and self-reflection.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
-                <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Target className="h-7 w-7 text-primary-foreground" />
-                </div>
-                <h3 className="text-2xl font-semibold mb-4 text-foreground">Precision</h3>
-                <p className="text-muted-foreground">
-                  Every decision backed by accurate data and clear insights to help you stay on track.
-                </p>
+            {/* Vision */}
+            <div className="text-center space-y-4">
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground">
+                Our Vision
+              </h2>
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+                To become the world's most life-centered wealth platform — guiding millions to build financial independence, emotional peace, and a deeper understanding of their true purpose.
+              </p>
+            </div>
+
+            {/* Values */}
+            <div>
+              <div className="text-center mb-16 space-y-4">
+                <h2 className="text-4xl md:text-5xl font-display font-bold text-foreground">
+                  Our Values
+                </h2>
               </div>
 
-              <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
-                <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <BookOpen className="h-7 w-7 text-primary-foreground" />
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <Target className="h-7 w-7 text-primary-foreground" />
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-2 text-foreground">Purpose Over Profit</h3>
                 </div>
-                <h3 className="text-2xl font-semibold mb-4 text-foreground">Learning</h3>
-                <p className="text-muted-foreground">
-                  Continuous growth through journaling, tracking, and strategic planning tools.
-                </p>
-              </div>
 
-              <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
-                <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Shield className="h-7 w-7 text-primary-foreground" />
+                <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <BookOpen className="h-7 w-7 text-primary-foreground" />
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-2 text-foreground">Clarity Over Noise</h3>
                 </div>
-                <h3 className="text-2xl font-semibold mb-4 text-foreground">Security</h3>
-                <p className="text-muted-foreground">
-                  Your data and privacy are our top priority with bank-level encryption.
-                </p>
+
+                <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <Shield className="h-7 w-7 text-primary-foreground" />
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-2 text-foreground">Empowerment Through Reflection</h3>
+                </div>
+
+                <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <TrendingUp className="h-7 w-7 text-primary-foreground" />
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-2 text-foreground">Sustainability Over Hype</h3>
+                </div>
+
+                <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <Target className="h-7 w-7 text-primary-foreground" />
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-2 text-foreground">Freedom Through Structure</h3>
+                </div>
+
+                <div className="group p-8 rounded-2xl bg-card border border-border hover:shadow-elegant transition-all">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <Shield className="h-7 w-7 text-primary-foreground" />
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-2 text-foreground">Authenticity Wins</h3>
+                </div>
               </div>
             </div>
           </div>
