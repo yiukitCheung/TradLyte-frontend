@@ -188,25 +188,91 @@ const Landing = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-32 bg-gradient-primary relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-        </div>
+      <section className="py-32 bg-background relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-subtle"></div>
+        <div className="absolute inset-0 opacity-[0.02]" style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)`,
+          backgroundSize: '40px 40px'
+        }}></div>
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-8">
-            <h2 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-white">
-              Ready to Transform Your Financial Future?
-            </h2>
-            <p className="text-2xl md:text-3xl text-white/90">
-              Join thousands discovering purpose through strategic wealth building.
-            </p>
-            <Link to="/auth">
-              <Button size="lg" variant="secondary" className="text-lg px-10 py-6 shadow-2xl hover:scale-105 transition-transform">
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+          <div className="max-w-6xl mx-auto">
+            {/* Main CTA Card */}
+            <div className="relative rounded-3xl bg-gradient-primary p-12 md:p-16 lg:p-20 overflow-hidden shadow-elegant">
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+              </div>
+              
+              <div className="relative z-10 text-center space-y-8 max-w-4xl mx-auto">
+                <h2 className="text-5xl md:text-7xl font-display font-bold text-white leading-tight">
+                  Ready to Transform Your Financial Future?
+                </h2>
+                <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto">
+                  Join thousands discovering purpose through strategic wealth building.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                  <Link to="/auth">
+                    <Button size="lg" variant="secondary" className="text-lg px-10 py-6 shadow-2xl hover:scale-105 transition-transform">
+                      Get Started Free
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <button className="text-white hover:text-white/80 transition-colors font-medium flex items-center gap-2 text-lg">
+                    See How It Works <ArrowRight className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Trust Indicators */}
+                <div className="grid grid-cols-3 gap-8 pt-12 max-w-2xl mx-auto border-t border-white/20">
+                  <div className="text-center">
+                    <div className="text-3xl md:text-4xl font-bold text-white mb-1">10K+</div>
+                    <div className="text-sm text-white/70">Active Users</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl md:text-4xl font-bold text-white mb-1">$2.4M</div>
+                    <div className="text-sm text-white/70">Assets Tracked</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl md:text-4xl font-bold text-white mb-1">98%</div>
+                    <div className="text-sm text-white/70">Satisfaction</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Feature Highlights Below */}
+            <div className="grid md:grid-cols-3 gap-6 mt-12">
+              <div className="flex items-start gap-4 p-6">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Shield className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-foreground mb-1">Bank-Level Security</h4>
+                  <p className="text-sm text-muted-foreground">Your data is encrypted and protected</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-4 p-6">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Target className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-foreground mb-1">Purpose-Driven</h4>
+                  <p className="text-sm text-muted-foreground">Align wealth with your values</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-4 p-6">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-foreground mb-1">Free to Start</h4>
+                  <p className="text-sm text-muted-foreground">No credit card required</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
