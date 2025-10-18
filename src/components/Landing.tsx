@@ -49,15 +49,63 @@ const Landing = () => {
               </button>
             </div>
 
-            {/* Trust Indicators */}
-            <div className="flex items-center gap-6 pt-8 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                <span>Bank-level security</span>
+            {/* Social Proof & Quick Stats */}
+            <div className="pt-8 space-y-6">
+              {/* User Avatars & Testimonial */}
+              <div className="flex items-center gap-4">
+                <div className="flex -space-x-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div 
+                      key={i} 
+                      className="w-12 h-12 rounded-full border-2 border-background bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold"
+                    >
+                      {String.fromCharCode(64 + i)}
+                    </div>
+                  ))}
+                  <div className="w-12 h-12 rounded-full border-2 border-background bg-muted flex items-center justify-center text-foreground text-sm font-semibold">
+                    +10K
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Sparkles key={star} className="h-4 w-4 fill-primary text-primary" />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">4.9/5</span> from investors finding their purpose
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                <span>Privacy-first</span>
+
+              {/* Quick Value Props */}
+              <div className="flex flex-wrap gap-3">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                  <span className="text-sm font-medium text-foreground">No-code strategies</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border">
+                  <div className="w-2 h-2 rounded-full bg-accent animate-pulse" style={{ animationDelay: "0.5s" }}></div>
+                  <span className="text-sm font-medium text-foreground">Automated trading</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: "1s" }}></div>
+                  <span className="text-sm font-medium text-foreground">Purpose-aligned growth</span>
+                </div>
+              </div>
+
+              {/* Trust Indicators */}
+              <div className="flex items-center gap-6 pt-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  <span>Bank-level security</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  <span>Privacy-first</span>
+                </div>
               </div>
             </div>
           </div>
