@@ -7,8 +7,12 @@ const Landing = () => {
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Hero Section - Asymmetric Split Layout */}
       <section className="relative min-h-screen grid lg:grid-cols-2 gap-8 items-center">
-        {/* Animated Background */}
+        {/* Animated Background with Pattern */}
         <div className="absolute inset-0 bg-gradient-subtle"></div>
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)`,
+          backgroundSize: '40px 40px'
+        }}></div>
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-20 -left-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-glow"></div>
           <div className="absolute bottom-20 -right-20 w-[500px] h-[500px] bg-accent/20 rounded-full blur-3xl animate-glow" style={{ animationDelay: "1.5s" }}></div>
@@ -22,14 +26,14 @@ const Landing = () => {
               <span className="text-sm font-medium text-foreground">Purpose-Driven Wealth Platform</span>
             </div>
             
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-foreground leading-[1.1]">
+            <h1 className="text-6xl md:text-8xl lg:text-9xl font-display font-bold text-foreground leading-[1.05]">
               Build Wealth
-              <span className="block text-transparent bg-clip-text bg-gradient-primary">
+              <span className="block text-transparent bg-clip-text bg-gradient-primary mt-2">
                 With Purpose
               </span>
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+            <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground leading-relaxed max-w-3xl">
               Stop chasing money. Start discovering meaning. TradLyte guides you to financial independence through purposeful investing and deep self-reflection.
             </p>
 
@@ -114,7 +118,7 @@ const Landing = () => {
             <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-4">
               Our Purpose
             </div>
-            <h2 className="text-4xl md:text-6xl font-display font-bold text-foreground">
+            <h2 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-foreground">
               Mission & Vision
             </h2>
           </div>
@@ -125,8 +129,8 @@ const Landing = () => {
               <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Target className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-3xl font-display font-bold mb-4 text-foreground">Our Mission</h3>
-              <p className="text-lg text-muted-foreground leading-relaxed">
+              <h3 className="text-4xl md:text-5xl font-display font-bold mb-6 text-foreground">Our Mission</h3>
+              <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed">
                 To liberate people from endlessly hunting money and resources — and guide them to discover meaning, direction, and peace through purposeful investing and self-reflection.
               </p>
             </div>
@@ -136,8 +140,8 @@ const Landing = () => {
               <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Sparkles className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-3xl font-display font-bold mb-4">Our Vision</h3>
-              <p className="text-lg leading-relaxed opacity-95">
+              <h3 className="text-4xl md:text-5xl font-display font-bold mb-6">Our Vision</h3>
+              <p className="text-xl md:text-2xl leading-relaxed opacity-95">
                 To become the world's most life-centered wealth platform — guiding millions to build financial independence, emotional peace, and a deeper understanding of their true purpose.
               </p>
             </div>
@@ -152,7 +156,7 @@ const Landing = () => {
             <div className="inline-block px-4 py-2 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-medium mb-4">
               What Drives Us
             </div>
-            <h2 className="text-4xl md:text-6xl font-display font-bold text-foreground">
+            <h2 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-foreground">
               Our Core Values
             </h2>
           </div>
@@ -191,10 +195,10 @@ const Landing = () => {
         </div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-8">
-            <h2 className="text-4xl md:text-6xl font-display font-bold text-white">
+            <h2 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-white">
               Ready to Transform Your Financial Future?
             </h2>
-            <p className="text-xl text-white/90">
+            <p className="text-2xl md:text-3xl text-white/90">
               Join thousands discovering purpose through strategic wealth building.
             </p>
             <Link to="/auth">
