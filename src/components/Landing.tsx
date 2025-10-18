@@ -166,6 +166,138 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Core Features Section - Bento Grid */}
+      <section className="py-32 bg-muted/30 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.02]" style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)`,
+          backgroundSize: '40px 40px'
+        }}></div>
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-4xl mx-auto text-center space-y-6 mb-20 animate-fade-in">
+            <div className="inline-block px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-4">
+              Platform Capabilities
+            </div>
+            <h2 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-foreground">
+              Your Financial Evolution Toolkit
+            </h2>
+            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
+              Build strategies, track purpose, and transform your relationship with wealth
+            </p>
+          </div>
+
+          {/* Bento Grid Layout */}
+          <div className="grid md:grid-cols-6 gap-6 max-w-7xl mx-auto">
+            {/* Large Feature 1 - Strategy Builder */}
+            <div className="md:col-span-4 group p-10 rounded-3xl bg-gradient-primary text-white overflow-hidden hover:scale-[1.02] transition-all duration-500 shadow-elegant">
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+              </div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <Target className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-4xl md:text-5xl font-display font-bold mb-4">No-Code Strategy Designer</h3>
+                <p className="text-xl opacity-95 mb-6 max-w-2xl">
+                  Build, visualize, and simulate custom investment strategies without writing a single line of code. Test safely before risking real capital.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-sm">Drag & Drop</span>
+                  <span className="px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-sm">Sandbox Testing</span>
+                  <span className="px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-sm">Strategy Templates</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Feature 2 - Life Alignment */}
+            <div className="md:col-span-2 group p-8 rounded-3xl bg-card border border-border hover:border-primary/40 hover:shadow-elegant transition-all duration-500">
+              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <BookOpen className="h-7 w-7 text-primary" />
+              </div>
+              <h3 className="text-2xl font-display font-bold text-foreground mb-3">Life Alignment Engine</h3>
+              <p className="text-muted-foreground">
+                Reflective questions and wisdom quotes guide you to align wealth with your deeper purpose
+              </p>
+            </div>
+
+            {/* Feature 3 - Risk Tracking */}
+            <div className="md:col-span-3 group p-8 rounded-3xl bg-card border border-border hover:border-primary/40 hover:shadow-elegant transition-all duration-500">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <BarChart3 className="h-7 w-7 text-white" />
+              </div>
+              <h3 className="text-2xl font-display font-bold text-foreground mb-3">Risk-Based Portfolio Tracker</h3>
+              <p className="text-muted-foreground mb-4">
+                Track growth based on your entry price and personal strategy—not generic market ratings
+              </p>
+              <span className="text-sm text-primary font-medium">Personalized Risk Assessment</span>
+            </div>
+
+            {/* Feature 4 - Automated Trading */}
+            <div className="md:col-span-3 group p-8 rounded-3xl bg-card border border-border hover:border-primary/40 hover:shadow-elegant transition-all duration-500">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <TrendingUp className="h-7 w-7 text-white" />
+              </div>
+              <h3 className="text-2xl font-display font-bold text-foreground mb-3">Semi/Full Automated Execution</h3>
+              <p className="text-muted-foreground mb-4">
+                Execute strategies hands-free, reducing emotional trading and screen time
+              </p>
+              <span className="text-sm text-accent font-medium">Passive Income Ready</span>
+            </div>
+
+            {/* Feature 5 - Wisdom Design */}
+            <div className="md:col-span-2 group p-8 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20 hover:border-primary/40 transition-all duration-500">
+              <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all">
+                <Sparkles className="h-7 w-7 text-white" />
+              </div>
+              <h3 className="text-xl font-display font-bold text-foreground mb-3">Wisdom-Infused Design</h3>
+              <p className="text-sm text-muted-foreground">
+                Quotes from investors and philosophers instill resilience and deeper thinking
+              </p>
+            </div>
+
+            {/* Feature 6 - Community */}
+            <div className="md:col-span-2 group p-8 rounded-3xl bg-card border border-border hover:border-primary/40 hover:shadow-elegant transition-all duration-500">
+              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <Shield className="h-7 w-7 text-primary" />
+              </div>
+              <h3 className="text-xl font-display font-bold text-foreground mb-3">Learning Community</h3>
+              <p className="text-sm text-muted-foreground">
+                Share strategies backed by proof, not hype—building trust and clarity together
+              </p>
+            </div>
+
+            {/* Feature 7 - Cooldown System */}
+            <div className="md:col-span-2 group p-8 rounded-3xl bg-card border border-border hover:border-primary/40 hover:shadow-elegant transition-all duration-500">
+              <div className="w-14 h-14 rounded-xl bg-accent/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <Target className="h-7 w-7 text-accent" />
+              </div>
+              <h3 className="text-xl font-display font-bold text-foreground mb-3">Post-Win Cooldown</h3>
+              <p className="text-sm text-muted-foreground">
+                Recommends breaks after emotional wins to reduce addiction and overtrading
+              </p>
+            </div>
+
+            {/* Feature 8 - Legacy Story */}
+            <div className="md:col-span-2 group p-8 rounded-3xl bg-card border border-primary/20 hover:border-primary/40 hover:shadow-elegant transition-all duration-500">
+              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <BookOpen className="h-7 w-7 text-primary" />
+              </div>
+              <h3 className="text-xl font-display font-bold text-foreground mb-3">Legacy Story</h3>
+              <p className="text-sm text-muted-foreground">
+                Create a story of self-growth to reflect on and pass as wisdom to others
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom highlight */}
+          <div className="text-center mt-16">
+            <p className="text-lg text-muted-foreground">
+              All features designed to reduce noise, restore peace, and guide purposeful growth
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Mission Section - Modern Card Layout */}
       <section className="py-32 bg-muted/30 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
