@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
 import StrategyBuilder from "./pages/StrategyBuilder";
 import Goals from "./pages/Goals";
+import Journal from "./pages/Journal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/strategy-builder" element={<StrategyBuilder />} />
           <Route path="/goals" element={<Goals />} />
+          <Route path="/journal" element={<Journal />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
