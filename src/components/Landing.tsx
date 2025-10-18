@@ -110,6 +110,62 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Transformation Journey Section */}
+      <section className="py-32 bg-background relative overflow-hidden">
+        <div className="container mx-auto px-4">
+          <div className="grid lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+            {/* Card 1 - From */}
+            <div className="group relative p-12 rounded-3xl bg-muted/50 border border-border overflow-hidden hover:border-primary/40 transition-all duration-500">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-500"></div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+                  <TrendingUp className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="text-6xl font-display font-bold text-foreground/30 mb-4">01</div>
+                <h3 className="text-3xl font-display font-bold text-foreground mb-4">Track</h3>
+                <p className="text-lg text-muted-foreground">Monitor wealth growth</p>
+              </div>
+            </div>
+
+            {/* Card 2 - Through */}
+            <div className="group relative p-12 rounded-3xl bg-gradient-primary text-white overflow-hidden hover:scale-[1.02] transition-all duration-500 shadow-elegant">
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+              </div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-6 transition-all">
+                  <BookOpen className="h-8 w-8 text-white" />
+                </div>
+                <div className="text-6xl font-display font-bold text-white/40 mb-4">02</div>
+                <h3 className="text-3xl font-display font-bold mb-4">Reflect</h3>
+                <p className="text-lg opacity-90">Discover your values</p>
+              </div>
+            </div>
+
+            {/* Card 3 - To */}
+            <div className="group relative p-12 rounded-3xl bg-card border border-primary/20 overflow-hidden hover:border-primary/60 hover:shadow-elegant transition-all duration-500">
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-500"></div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+                  <Target className="h-8 w-8 text-primary" />
+                </div>
+                <div className="text-6xl font-display font-bold text-primary/40 mb-4">03</div>
+                <h3 className="text-3xl font-display font-bold text-foreground mb-4">Transform</h3>
+                <p className="text-lg text-muted-foreground">Become who you want to be</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Subtle message below */}
+          <div className="text-center mt-16 max-w-3xl mx-auto">
+            <p className="text-2xl text-muted-foreground/60 italic">
+              Wealth is the tool. Purpose is the destination.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Mission Section - Modern Card Layout */}
       <section className="py-32 bg-muted/30 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
