@@ -9,6 +9,7 @@ import UserDashboard from "./pages/UserDashboard";
 import StrategyBuilder from "./pages/StrategyBuilder";
 import Goals from "./pages/Goals";
 import Journal from "./pages/Journal";
+import StockDetail from "./pages/StockDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/strategy-builder" element={<StrategyBuilder />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/journal" element={<Journal />} />
+          <Route path="/stock/:symbol" element={<StockDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
