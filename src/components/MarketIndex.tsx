@@ -2,9 +2,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// Helper function to get computed color from CSS variable
+const getComputedColor = (cssVar: string): string => {
+  if (typeof window === 'undefined') return cssVar;
+  const root = document.documentElement;
+  const hslValue = getComputedStyle(root).getPropertyValue(cssVar.replace('hsl(var(', '').replace('))', ''));
+  return hslValue ? `hsl(${hslValue})` : cssVar;
+};
 
 const MarketIndex = () => {
+  // Get actual computed colors from CSS variables
+  const [colors, setColors] = useState({
+    chart1: 'hsl(35 65% 55%)',
+    chart2: 'hsl(200 70% 50%)',
+    chart3: 'hsl(150 60% 45%)',
+    chart4: 'hsl(280 65% 60%)',
+    chart5: 'hsl(25 75% 55%)',
+  });
+
+  useEffect(() => {
+    // Compute actual colors after component mounts
+    setColors({
+      chart1: getComputedColor('hsl(var(--chart-1))'),
+      chart2: getComputedColor('hsl(var(--chart-2))'),
+      chart3: getComputedColor('hsl(var(--chart-3))'),
+      chart4: getComputedColor('hsl(var(--chart-4))'),
+      chart5: getComputedColor('hsl(var(--chart-5))'),
+    });
+  }, []);
   // Generate mock time series data (last 7 days) - normalized to percentage returns
   const generateTimeSeriesData = () => {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -41,22 +68,22 @@ const MarketIndex = () => {
   const [chartData] = useState(generateTimeSeriesData());
   
   const allIndices = [
-    { id: 'S&P 500', name: 'S&P 500', category: 'Major', color: 'hsl(var(--chart-1))' },
-    { id: 'Dow Jones', name: 'Dow Jones', category: 'Major', color: 'hsl(var(--chart-2))' },
-    { id: 'NASDAQ', name: 'NASDAQ', category: 'Major', color: 'hsl(var(--chart-3))' },
-    { id: 'Bitcoin', name: 'Bitcoin', category: 'Major', color: 'hsl(var(--chart-4))' },
-    { id: 'Technology', name: 'Technology', category: 'Sector', color: 'hsl(var(--chart-5))' },
-    { id: 'Healthcare', name: 'Healthcare', category: 'Sector', color: 'hsl(var(--chart-1))' },
-    { id: 'Financial', name: 'Financial', category: 'Sector', color: 'hsl(var(--chart-2))' },
-    { id: 'Energy', name: 'Energy', category: 'Sector', color: 'hsl(var(--chart-3))' },
-    { id: 'Consumer', name: 'Consumer', category: 'Sector', color: 'hsl(var(--chart-4))' },
-    { id: 'Industrial', name: 'Industrial', category: 'Sector', color: 'hsl(var(--chart-5))' },
-    { id: 'Materials', name: 'Materials', category: 'Sector', color: 'hsl(var(--chart-1))' },
-    { id: 'Utilities', name: 'Utilities', category: 'Sector', color: 'hsl(var(--chart-2))' },
-    { id: 'Crude Oil', name: 'Crude Oil', category: 'Commodity', color: 'hsl(var(--chart-3))' },
-    { id: 'Gold', name: 'Gold', category: 'Commodity', color: 'hsl(var(--chart-4))' },
-    { id: 'Silver', name: 'Silver', category: 'Commodity', color: 'hsl(var(--chart-5))' },
-    { id: 'Natural Gas', name: 'Natural Gas', category: 'Commodity', color: 'hsl(var(--chart-1))' },
+    { id: 'S&P 500', name: 'S&P 500', category: 'Major', color: colors.chart1 },
+    { id: 'Dow Jones', name: 'Dow Jones', category: 'Major', color: colors.chart2 },
+    { id: 'NASDAQ', name: 'NASDAQ', category: 'Major', color: colors.chart3 },
+    { id: 'Bitcoin', name: 'Bitcoin', category: 'Major', color: colors.chart4 },
+    { id: 'Technology', name: 'Technology', category: 'Sector', color: colors.chart5 },
+    { id: 'Healthcare', name: 'Healthcare', category: 'Sector', color: colors.chart1 },
+    { id: 'Financial', name: 'Financial', category: 'Sector', color: colors.chart2 },
+    { id: 'Energy', name: 'Energy', category: 'Sector', color: colors.chart3 },
+    { id: 'Consumer', name: 'Consumer', category: 'Sector', color: colors.chart4 },
+    { id: 'Industrial', name: 'Industrial', category: 'Sector', color: colors.chart5 },
+    { id: 'Materials', name: 'Materials', category: 'Sector', color: colors.chart1 },
+    { id: 'Utilities', name: 'Utilities', category: 'Sector', color: colors.chart2 },
+    { id: 'Crude Oil', name: 'Crude Oil', category: 'Commodity', color: colors.chart3 },
+    { id: 'Gold', name: 'Gold', category: 'Commodity', color: colors.chart4 },
+    { id: 'Silver', name: 'Silver', category: 'Commodity', color: colors.chart5 },
+    { id: 'Natural Gas', name: 'Natural Gas', category: 'Commodity', color: colors.chart1 },
   ];
 
   const [selectedIndices, setSelectedIndices] = useState<string[]>(['S&P 500', 'NASDAQ', 'Technology']);
@@ -161,19 +188,19 @@ const MarketIndex = () => {
           title="Fear Index"
           value={fearIndex}
           subtitle="Market Fear & Greed"
-          color="hsl(var(--chart-1))"
+          color={colors.chart1}
         />
         <GaugeCard
           title="Sector Sentiment"
           value={sectorSentiment}
           subtitle="Industry Health Score"
-          color="hsl(var(--chart-2))"
+          color={colors.chart2}
         />
         <GaugeCard
           title="Chaos Index"
           value={chaosIndex}
           subtitle="Commodity Volatility"
-          color="hsl(var(--chart-3))"
+          color={colors.chart3}
         />
       </div>
 
