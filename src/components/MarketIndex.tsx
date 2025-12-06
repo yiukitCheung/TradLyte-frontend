@@ -5,30 +5,36 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 const MarketIndex = () => {
-  // Generate mock time series data - Tradlyte Pick outperforms S&P 500
+  // Generate 3 years of monthly data - Tradlyte Pick outperforms S&P 500
   const generateChartData = () => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const data = [];
     let sp500 = 100, tradlyte = 100;
+    const startDate = new Date(2022, 0); // Jan 2022
     
-    return days.map((day, i) => {
+    for (let i = 0; i < 36; i++) {
+      const date = new Date(startDate);
+      date.setMonth(date.getMonth() + i);
+      const label = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      
       if (i > 0) {
-        sp500 *= 1 + (Math.random() * 0.02 - 0.005);
-        tradlyte *= 1 + (Math.random() * 0.02 + 0.008);
+        sp500 *= 1 + (Math.random() * 0.06 - 0.02);
+        tradlyte *= 1 + (Math.random() * 0.05 + 0.01);
       }
       
-      return {
-        day,
+      data.push({
+        month: label,
         'S&P 500': parseFloat(sp500.toFixed(2)),
         'Tradlyte Pick': parseFloat(tradlyte.toFixed(2)),
-      };
-    });
+      });
+    }
+    return data;
   };
 
   const [chartData] = useState(generateChartData());
   
-  const tradlyteReturn = ((chartData[chartData.length - 1]['Tradlyte Pick'] - 100)).toFixed(2);
-  const sp500Return = ((chartData[chartData.length - 1]['S&P 500'] - 100)).toFixed(2);
-  const outperformance = (parseFloat(tradlyteReturn) - parseFloat(sp500Return)).toFixed(2);
+  const tradlyteReturn = ((chartData[chartData.length - 1]['Tradlyte Pick'] - 100)).toFixed(1);
+  const sp500Return = ((chartData[chartData.length - 1]['S&P 500'] - 100)).toFixed(1);
+  const outperformance = (parseFloat(tradlyteReturn) - parseFloat(sp500Return)).toFixed(1);
 
   return (
     <Card className="shadow-card border-border/50 animate-fade-in">
@@ -36,7 +42,7 @@ const MarketIndex = () => {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <CardTitle className="text-2xl font-display">Tradlyte vs Market</CardTitle>
-            <p className="text-muted-foreground text-sm mt-1">7-day performance comparison</p>
+            <p className="text-muted-foreground text-sm mt-1">3-year performance comparison</p>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="secondary" className="text-sm py-1.5 px-3">
@@ -56,10 +62,11 @@ const MarketIndex = () => {
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
-                dataKey="day" 
+                dataKey="month" 
                 stroke="hsl(var(--muted-foreground))"
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                 axisLine={{ stroke: 'hsl(var(--border))' }}
+                interval={5}
               />
               <YAxis 
                 stroke="hsl(var(--muted-foreground))"
