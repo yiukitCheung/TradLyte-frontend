@@ -92,11 +92,11 @@ const UserDashboard = () => {
             </p>
           </div>
 
-          {/* Main Dashboard Grid */}
-          <div className="max-w-6xl mx-auto grid lg:grid-cols-4 gap-6">
+          {/* Main Dashboard Grid - Analytics + Growth Chart Side by Side */}
+          <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-6">
             
-            {/* Symbol Analytics - Main Section (3 cols) */}
-            <Card className="lg:col-span-3 shadow-elegant border-border/50 overflow-hidden relative group">
+            {/* Left: Symbol Analytics */}
+            <Card className="shadow-elegant border-border/50 overflow-hidden relative group">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
@@ -105,7 +105,7 @@ const UserDashboard = () => {
                       <BarChart3 className="h-5 w-5 text-primary" />
                       Symbol Analytics
                     </CardTitle>
-                    <CardDescription>Your personalized watchlist with Tradlyte scores</CardDescription>
+                    <CardDescription>Your watchlist with Tradlyte scores</CardDescription>
                   </div>
                   <Badge className="bg-primary/10 text-primary border-0">
                     <Zap className="w-3 h-3 mr-1" />
@@ -114,96 +114,65 @@ const UserDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Watchlist Table */}
+                {/* Watchlist Table - Compact */}
                 <div className="rounded-lg border border-border/50 overflow-hidden">
-                  <div className="grid grid-cols-5 gap-4 p-3 bg-muted/30 text-sm font-medium text-muted-foreground">
+                  <div className="grid grid-cols-4 gap-2 p-3 bg-muted/30 text-xs font-medium text-muted-foreground">
                     <span>Symbol</span>
                     <span>Price</span>
                     <span>Change</span>
-                    <span>Tradlyte Score</span>
-                    <span className="text-right">Action</span>
+                    <span>Score</span>
                   </div>
-                  {watchlistStocks.map((stock, index) => (
+                  {watchlistStocks.map((stock) => (
                     <div 
                       key={stock.symbol} 
-                      className="grid grid-cols-5 gap-4 p-4 items-center border-t border-border/30 hover:bg-muted/20 transition-colors cursor-pointer"
+                      className="grid grid-cols-4 gap-2 p-3 items-center border-t border-border/30 hover:bg-muted/20 transition-colors cursor-pointer"
                       onClick={() => navigate(`/stock/${stock.symbol}`)}
                     >
                       <div>
-                        <div className="font-semibold text-foreground">{stock.symbol}</div>
-                        <div className="text-xs text-muted-foreground">{stock.name}</div>
+                        <div className="font-semibold text-foreground text-sm">{stock.symbol}</div>
+                        <div className="text-xs text-muted-foreground truncate">{stock.name}</div>
                       </div>
-                      <div className="font-mono font-medium">${stock.price.toFixed(2)}</div>
-                      <div className={`flex items-center gap-1 ${stock.change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {stock.change >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                        <span className="font-medium">{stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%</span>
+                      <div className="font-mono text-sm">${stock.price.toFixed(2)}</div>
+                      <div className={`flex items-center gap-1 text-sm ${stock.change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {stock.change >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        <span>{stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="flex items-center gap-1">
+                        <div className="w-10 h-1.5 bg-muted rounded-full overflow-hidden">
                           <div 
-                            className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                            className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
                             style={{ width: `${stock.score}%` }}
                           />
                         </div>
-                        <span className="text-sm font-semibold text-primary">{stock.score}</span>
+                        <span className="text-xs font-semibold text-primary">{stock.score}</span>
                       </div>
-                      <div className="text-right">
-                        <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/10">
-                          <LineChart className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Market Pulse - Inline */}
+                <div className="grid grid-cols-3 gap-2">
+                  {marketIndicators.map((indicator) => (
+                    <div 
+                      key={indicator.name} 
+                      className="p-2 rounded-lg bg-muted/30 text-center"
+                    >
+                      <div className="text-xs text-muted-foreground">{indicator.name}</div>
+                      <div className="font-semibold font-mono text-sm">{indicator.value}</div>
+                      <Badge 
+                        variant="secondary" 
+                        className={`text-xs ${indicator.positive ? 'bg-green-500/10 text-green-600 border-0' : 'bg-red-500/10 text-red-500 border-0'}`}
+                      >
+                        {indicator.change}
+                      </Badge>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Side Panel */}
-            <div className="space-y-6">
-              {/* Market Pulse */}
-              <Card className="shadow-card border-border/50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-display flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-accent" />
-                    Market Pulse
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {marketIndicators.map((indicator) => (
-                    <div 
-                      key={indicator.name} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                    >
-                      <div>
-                        <div className="text-sm text-muted-foreground">{indicator.name}</div>
-                        <div className="font-semibold font-mono">{indicator.value}</div>
-                      </div>
-                      <Badge 
-                        variant="secondary" 
-                        className={indicator.positive ? 'bg-green-500/10 text-green-600 border-0' : 'bg-red-500/10 text-red-500 border-0'}
-                      >
-                        {indicator.change}
-                      </Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Performance Card */}
-              <Card className="shadow-card border-border/50 bg-gradient-to-br from-primary/5 to-accent/5">
-                <CardContent className="pt-6">
-                  <div className="text-center space-y-2">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-2">
-                      <PieChart className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="text-3xl font-bold font-display text-foreground">+24.7%</div>
-                    <p className="text-sm text-muted-foreground">Your YTD Performance</p>
-                    <p className="text-xs text-primary font-medium">Beating S&P by 8.2%</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Right: Your Growth vs Market Chart */}
+            <MarketIndex variant="user" />
           </div>
 
           {/* Stock Search Section */}

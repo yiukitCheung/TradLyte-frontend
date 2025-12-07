@@ -1,14 +1,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Sparkles } from "lucide-react";
+import { TrendingUp, Sparkles, User } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
-const MarketIndex = () => {
-  // Generate 3 years of monthly data - Tradlyte Pick outperforms S&P 500
+interface MarketIndexProps {
+  variant?: 'default' | 'user';
+}
+
+const MarketIndex = ({ variant = 'default' }: MarketIndexProps) => {
+  const isUserMode = variant === 'user';
+  const primaryLabel = isUserMode ? 'Your Portfolio' : 'Tradlyte Pick';
+  
+  // Generate 3 years of monthly data
   const generateChartData = () => {
     const data = [];
-    let sp500 = 100, tradlyte = 100;
+    let sp500 = 100, primary = 100;
     const startDate = new Date(2022, 0); // Jan 2022
     
     for (let i = 0; i < 36; i++) {
@@ -18,13 +25,13 @@ const MarketIndex = () => {
       
       if (i > 0) {
         sp500 *= 1 + (Math.random() * 0.06 - 0.02);
-        tradlyte *= 1 + (Math.random() * 0.05 + 0.01);
+        primary *= 1 + (Math.random() * 0.05 + 0.01);
       }
       
       data.push({
         month: label,
         'S&P 500': parseFloat(sp500.toFixed(2)),
-        'Tradlyte Pick': parseFloat(tradlyte.toFixed(2)),
+        [primaryLabel]: parseFloat(primary.toFixed(2)),
       });
     }
     return data;
@@ -32,22 +39,24 @@ const MarketIndex = () => {
 
   const [chartData] = useState(generateChartData());
   
-  const tradlyteReturn = ((chartData[chartData.length - 1]['Tradlyte Pick'] - 100)).toFixed(1);
+  const primaryReturn = ((chartData[chartData.length - 1][primaryLabel] - 100)).toFixed(1);
   const sp500Return = ((chartData[chartData.length - 1]['S&P 500'] - 100)).toFixed(1);
-  const outperformance = (parseFloat(tradlyteReturn) - parseFloat(sp500Return)).toFixed(1);
+  const outperformance = (parseFloat(primaryReturn) - parseFloat(sp500Return)).toFixed(1);
 
   return (
-    <Card className="shadow-card border-border/50 animate-fade-in">
+    <Card className="shadow-card border-border/50 animate-fade-in h-full">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <CardTitle className="text-2xl font-display">Tradlyte vs Market</CardTitle>
+            <CardTitle className="text-xl font-display">
+              {isUserMode ? 'Your Growth vs Market' : 'Tradlyte vs Market'}
+            </CardTitle>
             <p className="text-muted-foreground text-sm mt-1">3-year performance comparison</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Badge variant="secondary" className="text-sm py-1.5 px-3">
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-              Tradlyte: <span className="text-primary font-semibold ml-1">+{tradlyteReturn}%</span>
+              {isUserMode ? <User className="w-3.5 h-3.5 mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+              {isUserMode ? 'You' : 'Tradlyte'}: <span className="text-primary font-semibold ml-1">+{primaryReturn}%</span>
             </Badge>
             <Badge variant="outline" className="text-sm py-1.5 px-3 border-primary/30 bg-primary/5">
               <TrendingUp className="w-3.5 h-3.5 mr-1.5 text-primary" />
@@ -57,7 +66,7 @@ const MarketIndex = () => {
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        <div className="h-[300px] w-full">
+        <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
@@ -99,10 +108,10 @@ const MarketIndex = () => {
                 activeDot={{ r: 4 }}
                 strokeOpacity={0.6}
               />
-              {/* Tradlyte Pick - emphasized primary color */}
+              {/* Primary line - emphasized primary color */}
               <Line
                 type="monotone"
-                dataKey="Tradlyte Pick"
+                dataKey={primaryLabel}
                 stroke="hsl(var(--primary))"
                 strokeWidth={4}
                 dot={false}
@@ -120,7 +129,7 @@ const MarketIndex = () => {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-6 h-1 rounded-full bg-primary" />
-            <span className="text-sm font-semibold text-foreground">Tradlyte Pick</span>
+            <span className="text-sm font-semibold text-foreground">{primaryLabel}</span>
           </div>
         </div>
       </CardContent>
