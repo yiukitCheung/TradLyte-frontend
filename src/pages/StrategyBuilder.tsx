@@ -126,7 +126,7 @@ const StrategyBuilder = () => {
 
           {/* Performance Chart - Right */}
           <div className="lg:col-span-4">
-            <PerformanceChart isSimulating={isSimulating} />
+            <PerformanceChart isSimulating={isSimulating} conditions={selectedConditions} />
           </div>
         </div>
       </div>
