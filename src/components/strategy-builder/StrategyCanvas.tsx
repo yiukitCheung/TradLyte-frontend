@@ -3,13 +3,15 @@ import { Button } from "@/components/ui/button";
 import { X, Settings, Layers } from "lucide-react";
 import { Condition } from "@/pages/StrategyBuilder";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface StrategyCanvasProps {
   conditions: Condition[];
   onRemoveCondition: (id: string) => void;
+  onAddCondition: (condition: Condition) => void;
 }
 
-const StrategyCanvas = ({ conditions, onRemoveCondition }: StrategyCanvasProps) => {
+const StrategyCanvas = ({ conditions, onRemoveCondition, onAddCondition }: StrategyCanvasProps) => {
   const [dragOver, setDragOver] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -24,6 +26,17 @@ const StrategyCanvas = ({ conditions, onRemoveCondition }: StrategyCanvasProps) 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
+    
+    const conditionData = e.dataTransfer.getData("condition");
+    if (conditionData) {
+      try {
+        const condition = JSON.parse(conditionData);
+        onAddCondition({ ...condition, id: `${condition.id}-${Date.now()}` });
+        toast.success(`Added: ${condition.label}`);
+      } catch (error) {
+        console.error("Failed to parse condition data:", error);
+      }
+    }
   };
 
   return (

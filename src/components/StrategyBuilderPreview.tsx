@@ -124,6 +124,12 @@ const StrategyBuilderPreview = ({ isAuthenticated }: StrategyBuilderPreviewProps
             <StrategyCanvas 
               conditions={selectedConditions}
               onRemoveCondition={handleRemoveCondition}
+              onAddCondition={(condition) => {
+                if (!isAuthenticated && selectedConditions.length >= 2) {
+                  return;
+                }
+                setSelectedConditions([...selectedConditions, condition]);
+              }}
             />
           </div>
         </div>

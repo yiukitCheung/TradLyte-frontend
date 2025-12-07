@@ -121,6 +121,7 @@ const StrategyBuilder = () => {
             <StrategyCanvas 
               conditions={selectedConditions}
               onRemoveCondition={handleRemoveCondition}
+              onAddCondition={(condition) => setSelectedConditions([...selectedConditions, condition])}
             />
           </div>
 
