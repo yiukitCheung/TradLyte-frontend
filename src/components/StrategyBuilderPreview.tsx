@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lock, Sparkles, RotateCcw, ArrowRight } from "lucide-react";
+import { Lock, Sparkles, RotateCcw, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import ConditionLibrary from "@/components/strategy-builder/ConditionLibrary";
 import StrategyCanvas from "@/components/strategy-builder/StrategyCanvas";
@@ -15,7 +15,7 @@ interface StrategyBuilderPreviewProps {
 
 const StrategyBuilderPreview = ({ isAuthenticated }: StrategyBuilderPreviewProps) => {
   const [selectedConditions, setSelectedConditions] = useState<Condition[]>([]);
-  const [activeTab, setActiveTab] = useState<"beginner" | "intermediate" | "advanced">("beginner");
+  const [activeTab, setActiveTab] = useState<"entry" | "exit">("entry");
 
   const handleDrop = (condition: Condition) => {
     // Limit to 2 conditions for non-authenticated users
@@ -95,38 +95,25 @@ const StrategyBuilderPreview = ({ isAuthenticated }: StrategyBuilderPreviewProps
             </div>
             Condition Library
           </h2>
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="beginner" className="text-xs">Basic</TabsTrigger>
-              <TabsTrigger value="intermediate" disabled={!isAuthenticated} className="text-xs">
-                <div className="flex items-center gap-1">
-                  Advanced
-                  {!isAuthenticated && <Lock className="h-3 w-3" />}
-                </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "entry" | "exit")} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="entry" className="text-xs flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Entry (Buy)
               </TabsTrigger>
-              <TabsTrigger value="advanced" disabled={!isAuthenticated} className="text-xs">
-                <div className="flex items-center gap-1">
-                  Pro
-                  {!isAuthenticated && <Lock className="h-3 w-3" />}
-                </div>
+              <TabsTrigger value="exit" className="text-xs flex items-center gap-1">
+                <TrendingDown className="h-3 w-3" />
+                Exit (Sell)
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="beginner" className="mt-0">
-              <ConditionLibrary category="beginner" onDrop={handleDrop} />
+            <TabsContent value="entry" className="mt-0">
+              <ConditionLibrary category="entry" onDrop={handleDrop} />
             </TabsContent>
 
-            {isAuthenticated && (
-              <>
-                <TabsContent value="intermediate" className="mt-0">
-                  <ConditionLibrary category="intermediate" onDrop={handleDrop} />
-                </TabsContent>
-
-                <TabsContent value="advanced" className="mt-0">
-                  <ConditionLibrary category="advanced" onDrop={handleDrop} />
-                </TabsContent>
-              </>
-            )}
+            <TabsContent value="exit" className="mt-0">
+              <ConditionLibrary category="exit" onDrop={handleDrop} />
+            </TabsContent>
           </Tabs>
         </Card>
 

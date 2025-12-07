@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Save, RotateCcw, Sparkles } from "lucide-react";
+import { Play, Save, RotateCcw, Sparkles, TrendingUp, TrendingDown } from "lucide-react";
 import Header from "@/components/Header";
 import ConditionLibrary from "@/components/strategy-builder/ConditionLibrary";
 import StrategyCanvas from "@/components/strategy-builder/StrategyCanvas";
@@ -13,7 +13,7 @@ export interface Condition {
   id: string;
   type: string;
   label: string;
-  category: "beginner" | "intermediate" | "advanced";
+  category: "entry" | "exit";
   parameters?: Record<string, any>;
 }
 
@@ -107,25 +107,25 @@ const StrategyBuilder = () => {
                 </div>
                 Condition Library
               </h2>
-              <Tabs defaultValue="beginner" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-4">
-                  <TabsTrigger value="beginner" className="text-xs">Beginner</TabsTrigger>
-                  <TabsTrigger value="intermediate" className="text-xs">Intermediate</TabsTrigger>
-                  <TabsTrigger value="advanced" className="text-xs">Advanced</TabsTrigger>
+              <Tabs defaultValue="entry" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="entry" className="text-xs flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    Entry (Buy)
+                  </TabsTrigger>
+                  <TabsTrigger value="exit" className="text-xs flex items-center gap-1">
+                    <TrendingDown className="h-3 w-3" />
+                    Exit (Sell)
+                  </TabsTrigger>
                 </TabsList>
-                <TabsContent value="beginner">
+                <TabsContent value="entry">
                   <div className="grid grid-cols-2 gap-2">
-                    <ConditionLibrary category="beginner" onDrop={handleDrop} />
+                    <ConditionLibrary category="entry" onDrop={handleDrop} />
                   </div>
                 </TabsContent>
-                <TabsContent value="intermediate">
+                <TabsContent value="exit">
                   <div className="grid grid-cols-2 gap-2">
-                    <ConditionLibrary category="intermediate" onDrop={handleDrop} />
-                  </div>
-                </TabsContent>
-                <TabsContent value="advanced">
-                  <div className="grid grid-cols-2 gap-2">
-                    <ConditionLibrary category="advanced" onDrop={handleDrop} />
+                    <ConditionLibrary category="exit" onDrop={handleDrop} />
                   </div>
                 </TabsContent>
               </Tabs>

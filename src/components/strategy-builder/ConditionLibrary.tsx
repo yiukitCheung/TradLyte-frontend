@@ -1,30 +1,28 @@
-import { TrendingUp, TrendingDown, DollarSign, Calendar, Shield, Target, Zap, Brain } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Calendar, Shield, Target, Zap, Brain, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Condition } from "@/pages/StrategyBuilder";
 
 interface ConditionLibraryProps {
-  category: "beginner" | "intermediate" | "advanced";
+  category: "entry" | "exit";
   onDrop: (condition: Condition) => void;
 }
 
 const conditionsByCategory = {
-  beginner: [
-    { id: "buy-dip", type: "buy-dip", label: "Buy the Dip", icon: TrendingDown, description: "Buy when market drops" },
-    { id: "take-profit", type: "take-profit", label: "Take Profit", icon: TrendingUp, description: "Sell at profit target" },
-    { id: "dollar-cost", type: "dollar-cost", label: "Dollar Cost Average", icon: DollarSign, description: "Regular investing" },
-    { id: "hold-period", type: "hold-period", label: "Hold Period", icon: Calendar, description: "Hold for duration" },
+  entry: [
+    { id: "buy-dip", type: "buy-dip", label: "Buy the Dip", icon: TrendingDown, description: "Buy when price drops X%" },
+    { id: "dollar-cost", type: "dollar-cost", label: "Dollar Cost Average", icon: DollarSign, description: "Regular scheduled buys" },
+    { id: "momentum-buy", type: "momentum-buy", label: "Momentum Entry", icon: TrendingUp, description: "Buy on upward trend" },
+    { id: "rsi-oversold", type: "rsi-oversold", label: "RSI Oversold", icon: Brain, description: "Buy when RSI < 30" },
+    { id: "macd-bullish", type: "macd-bullish", label: "MACD Bullish Cross", icon: Zap, description: "Buy on MACD crossover" },
+    { id: "support-bounce", type: "support-bounce", label: "Support Bounce", icon: ArrowUpCircle, description: "Buy at support level" },
   ],
-  intermediate: [
-    { id: "stop-loss", type: "stop-loss", label: "Stop Loss", icon: Shield, description: "Limit downside risk" },
-    { id: "trailing-stop", type: "trailing-stop", label: "Trailing Stop", icon: Target, description: "Dynamic protection" },
-    { id: "rebalance", type: "rebalance", label: "Rebalance", icon: Zap, description: "Portfolio adjustment" },
-    { id: "momentum", type: "momentum", label: "Momentum Signal", icon: TrendingUp, description: "Trend following" },
-  ],
-  advanced: [
-    { id: "rsi-condition", type: "rsi-condition", label: "RSI Indicator", icon: Brain, description: "Relative strength" },
-    { id: "macd-cross", type: "macd-cross", label: "MACD Crossover", icon: Zap, description: "Moving average conv." },
-    { id: "volume-spike", type: "volume-spike", label: "Volume Spike", icon: TrendingUp, description: "Unusual volume" },
-    { id: "custom-logic", type: "custom-logic", label: "Custom Logic", icon: Brain, description: "Your own rules" },
+  exit: [
+    { id: "take-profit", type: "take-profit", label: "Take Profit", icon: TrendingUp, description: "Sell at profit target %" },
+    { id: "stop-loss", type: "stop-loss", label: "Stop Loss", icon: Shield, description: "Sell to limit losses" },
+    { id: "trailing-stop", type: "trailing-stop", label: "Trailing Stop", icon: Target, description: "Dynamic stop follows price" },
+    { id: "hold-period", type: "hold-period", label: "Time-Based Exit", icon: Calendar, description: "Sell after X days/months" },
+    { id: "rsi-overbought", type: "rsi-overbought", label: "RSI Overbought", icon: Brain, description: "Sell when RSI > 70" },
+    { id: "resistance-hit", type: "resistance-hit", label: "Resistance Hit", icon: ArrowDownCircle, description: "Sell at resistance level" },
   ],
 };
 
@@ -52,8 +50,12 @@ const ConditionLibrary = ({ category, onDrop }: ConditionLibraryProps) => {
               onClick={() => onDrop({ ...condition, category })}
             >
               <div className="flex items-start gap-3 w-full">
-                <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                  <Icon className="h-5 w-5 text-primary-foreground" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${
+                  category === "entry" 
+                    ? "bg-green-500/20 text-green-600 dark:text-green-400" 
+                    : "bg-red-500/20 text-red-600 dark:text-red-400"
+                }`}>
+                  <Icon className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-foreground">{condition.label}</div>
