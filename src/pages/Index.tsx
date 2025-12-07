@@ -45,22 +45,12 @@ const Index = () => {
             <MarketIndex />
           </section>
 
-          {/* Dashboard Section */}
-          <section id="dashboard" className="max-w-6xl mx-auto">
-            {user ? (
+          {/* Dashboard Section - Only show for logged in users */}
+          {user && (
+            <section id="dashboard" className="max-w-6xl mx-auto">
               <Dashboard />
-            ) : (
-              <FeaturePreview 
-                title="Your Growth Dashboard"
-                description="Track your progress with clarity and focus"
-                features={[
-                  "Monthly Progress Tracking",
-                  "Goals Completion Status",
-                  "Journal Entry Analytics"
-                ]}
-              />
-            )}
-          </section>
+            </section>
+          )}
 
           {/* Strategy Builder Section */}
           <section id="strategy-builder" className="max-w-6xl mx-auto">
