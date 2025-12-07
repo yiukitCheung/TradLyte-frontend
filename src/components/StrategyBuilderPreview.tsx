@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lock, Sparkles } from "lucide-react";
+import { Lock, Sparkles, RotateCcw, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import ConditionLibrary from "@/components/strategy-builder/ConditionLibrary";
 import StrategyCanvas from "@/components/strategy-builder/StrategyCanvas";
+import PerformanceChart from "@/components/strategy-builder/PerformanceChart";
 import { Condition } from "@/pages/StrategyBuilder";
 
 interface StrategyBuilderPreviewProps {
@@ -34,43 +35,76 @@ const StrategyBuilderPreview = ({ isAuthenticated }: StrategyBuilderPreviewProps
 
   return (
     <div className="space-y-6">
-      {!isAuthenticated && (
-        <Card className="p-6 bg-primary/5 border-primary/20">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-foreground mb-2">
-                Limited Preview Mode
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                You can build strategies with up to 2 conditions. Sign in to unlock unlimited conditions, save strategies, and run backtests.
-              </p>
+      {/* Header with CTA */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        {!isAuthenticated && (
+          <Card className="p-4 bg-primary/5 border-primary/20 flex-1">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">Preview Mode:</span> Try up to 2 conditions. Sign in for full access.
+                </p>
+              </div>
               <Link to="/auth">
-                <Button variant="default" size="sm">
-                  Sign In to Unlock Full Features
+                <Button size="sm">
+                  Sign In <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </Link>
             </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
+        
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleReset}
+            disabled={selectedConditions.length === 0}
+          >
+            <RotateCcw className="h-4 w-4 mr-1" />
+            Reset
+          </Button>
+          {isAuthenticated ? (
+            <Link to="/strategy-builder">
+              <Button size="sm">
+                Open Full Builder <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          ) : (
+            <Button size="sm" disabled>
+              <Lock className="h-4 w-4 mr-1" />
+              Save Strategy
+            </Button>
+          )}
+        </div>
+      </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      {/* Performance Chart - Hero Section */}
+      <PerformanceChart isSimulating={false} conditions={selectedConditions} />
+
+      {/* Building Tools - Bottom Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Condition Library */}
         <Card className="p-6 shadow-card">
-          <h2 className="text-xl font-semibold text-foreground mb-4">Condition Library</h2>
+          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-subtle flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-primary" />
+            </div>
+            Condition Library
+          </h2>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="beginner">Basic</TabsTrigger>
-              <TabsTrigger value="intermediate" disabled={!isAuthenticated}>
+              <TabsTrigger value="beginner" className="text-xs">Basic</TabsTrigger>
+              <TabsTrigger value="intermediate" disabled={!isAuthenticated} className="text-xs">
                 <div className="flex items-center gap-1">
                   Advanced
                   {!isAuthenticated && <Lock className="h-3 w-3" />}
                 </div>
               </TabsTrigger>
-              <TabsTrigger value="advanced" disabled={!isAuthenticated}>
+              <TabsTrigger value="advanced" disabled={!isAuthenticated} className="text-xs">
                 <div className="flex items-center gap-1">
                   Pro
                   {!isAuthenticated && <Lock className="h-3 w-3" />}
@@ -97,42 +131,16 @@ const StrategyBuilderPreview = ({ isAuthenticated }: StrategyBuilderPreviewProps
         </Card>
 
         {/* Strategy Canvas */}
-        <div className="lg:col-span-2">
-          <div className="space-y-4">
-            <div className="flex gap-2 justify-end">
-              <Button 
-                variant="outline" 
-                onClick={handleReset}
-                disabled={selectedConditions.length === 0}
-              >
-                Reset
-              </Button>
-              {isAuthenticated ? (
-                <Link to="/strategy-builder">
-                  <Button>
-                    Open Full Builder
-                  </Button>
-                </Link>
-              ) : (
-                <Button disabled>
-                  <Lock className="h-4 w-4 mr-2" />
-                  Save Strategy (Sign in required)
-                </Button>
-              )}
-            </div>
-
-            <StrategyCanvas 
-              conditions={selectedConditions}
-              onRemoveCondition={handleRemoveCondition}
-              onAddCondition={(condition) => {
-                if (!isAuthenticated && selectedConditions.length >= 2) {
-                  return;
-                }
-                setSelectedConditions([...selectedConditions, condition]);
-              }}
-            />
-          </div>
-        </div>
+        <StrategyCanvas 
+          conditions={selectedConditions}
+          onRemoveCondition={handleRemoveCondition}
+          onAddCondition={(condition) => {
+            if (!isAuthenticated && selectedConditions.length >= 2) {
+              return;
+            }
+            setSelectedConditions([...selectedConditions, condition]);
+          }}
+        />
       </div>
     </div>
   );
