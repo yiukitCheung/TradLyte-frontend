@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import MarketIndex from '@/components/MarketIndex';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -90,11 +89,6 @@ const UserDashboard = () => {
             <p className="text-muted-foreground">
               Track your journey with clarity and purpose
             </p>
-          </div>
-
-          {/* Your Growth vs Market - Full Width */}
-          <div className="max-w-6xl mx-auto">
-            <MarketIndex variant="user" />
           </div>
 
           {/* Symbol Analytics - Wide Table Format */}
@@ -243,10 +237,6 @@ const UserDashboard = () => {
             </Card>
           </div>
 
-          {/* Market Overview */}
-          <div className="max-w-6xl mx-auto">
-            <MarketIndex />
-          </div>
 
           {/* Quick Stats Row */}
           <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-6">
