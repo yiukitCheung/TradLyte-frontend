@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
@@ -5,22 +6,42 @@ import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, TrendingUp, TrendingDown, Plus, Check, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const StockDetail = () => {
   const { symbol } = useParams<{ symbol: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  
+  const [isInPortfolio, setIsInPortfolio] = useState(false);
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [buyInPrice, setBuyInPrice] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [isAdding, setIsAdding] = useState(false);
 
   // Placeholder data - will be replaced by backend
   const stockData = {
     symbol: symbol || "AAPL",
-    name: "Apple Inc.",
+    name: getStockName(symbol || "AAPL"),
     price: 178.45,
     change: 2.34,
     changePercent: 1.33,
-    recommendationScore: user ? 87 : 72, // Higher score for logged-in users with strategy
+    recommendationScore: user ? 87 : 72,
     strategyName: user ? "Growth & Value Mix" : "Default Strategy",
     correlatedIndices: [
       { name: "S&P 500", correlation: 0.92, change: 1.2 },
@@ -40,6 +61,94 @@ const StockDetail = () => {
       profitMargin: "25.3%",
     },
   };
+
+  // Check if stock is already in user's portfolio
+  useEffect(() => {
+    const checkPortfolio = async () => {
+      if (!user || !symbol) {
+        setPortfolioLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('user_portfolio')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('asset_name', symbol)
+          .maybeSingle();
+
+        if (error) throw error;
+        setIsInPortfolio(!!data);
+      } catch (error) {
+        console.error('Error checking portfolio:', error);
+      } finally {
+        setPortfolioLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      checkPortfolio();
+    }
+  }, [user, symbol, authLoading]);
+
+  const handleAddToPortfolio = async () => {
+    if (!user || !symbol) return;
+
+    const price = parseFloat(buyInPrice);
+    const qty = parseFloat(quantity);
+
+    if (isNaN(price) || price <= 0) {
+      toast.error("Please enter a valid buy-in price");
+      return;
+    }
+
+    if (isNaN(qty) || qty <= 0) {
+      toast.error("Please enter a valid quantity");
+      return;
+    }
+
+    setIsAdding(true);
+
+    try {
+      const { error } = await supabase
+        .from('user_portfolio')
+        .insert({
+          user_id: user.id,
+          asset_name: symbol,
+          asset_type: 'stock',
+          purchase_price: price,
+          current_price: stockData.price,
+          quantity: qty,
+        });
+
+      if (error) throw error;
+
+      setIsInPortfolio(true);
+      setAddDialogOpen(false);
+      toast.success(`${symbol} added to your portfolio!`);
+      setBuyInPrice("");
+      setQuantity("1");
+    } catch (error: any) {
+      console.error('Error adding to portfolio:', error);
+      toast.error(error.message || "Failed to add to portfolio");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  function getStockName(sym: string): string {
+    const names: Record<string, string> = {
+      AAPL: "Apple Inc.",
+      GOOGL: "Alphabet Inc.",
+      MSFT: "Microsoft Corporation",
+      AMZN: "Amazon.com Inc.",
+      TSLA: "Tesla Inc.",
+      META: "Meta Platforms Inc.",
+      NVDA: "NVIDIA Corporation",
+    };
+    return names[sym] || `${sym} Inc.`;
+  }
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-primary";
@@ -71,13 +180,90 @@ const StockDetail = () => {
 
           {/* Stock Header */}
           <div className="mb-8 animate-fade-in">
-            <div className="flex items-center gap-4 mb-2">
-              <h1 className="text-4xl font-display font-bold text-foreground">
-                {stockData.symbol}
-              </h1>
-              <Badge variant="secondary" className="text-sm">
-                {stockData.name}
-              </Badge>
+            <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
+              <div className="flex items-center gap-4">
+                <h1 className="text-4xl font-display font-bold text-foreground">
+                  {stockData.symbol}
+                </h1>
+                <Badge variant="secondary" className="text-sm">
+                  {stockData.name}
+                </Badge>
+              </div>
+              
+              {/* Add to Portfolio Button */}
+              {user && !authLoading && (
+                portfolioLoading ? (
+                  <Button disabled variant="outline">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </Button>
+                ) : isInPortfolio ? (
+                  <Button variant="outline" disabled className="text-primary border-primary">
+                    <Check className="mr-2 h-4 w-4" />
+                    In Portfolio
+                  </Button>
+                ) : (
+                  <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="default">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add to Portfolio
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add {symbol} to Portfolio</DialogTitle>
+                        <DialogDescription>
+                          Enter your buy-in price and quantity to track this stock in your portfolio.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="buyInPrice">Buy-in Price ($)</Label>
+                          <Input
+                            id="buyInPrice"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder={stockData.price.toString()}
+                            value={buyInPrice}
+                            onChange={(e) => setBuyInPrice(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Current price: ${stockData.price.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="quantity">Quantity (shares)</Label>
+                          <Input
+                            id="quantity"
+                            type="number"
+                            step="1"
+                            min="1"
+                            placeholder="1"
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleAddToPortfolio} disabled={isAdding}>
+                          {isAdding ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            "Add to Portfolio"
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )
+              )}
             </div>
             <div className="flex items-baseline gap-4">
               <span className="text-3xl font-bold text-foreground">
@@ -104,12 +290,16 @@ const StockDetail = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Recommendation Score</span>
-                {user && (
+                {authLoading ? (
+                  <Badge variant="outline" className="text-sm">
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    Loading...
+                  </Badge>
+                ) : user ? (
                   <Badge variant="outline" className="text-sm">
                     Based on: {stockData.strategyName}
                   </Badge>
-                )}
-                {!user && (
+                ) : (
                   <Badge variant="outline" className="text-sm">
                     Sign in for personalized scores
                   </Badge>
