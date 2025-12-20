@@ -90,17 +90,6 @@ const Hero = () => {
           {/* CTA Section for new users */}
           {!user && (
             <div className="pt-8 space-y-6 animate-fade-in" style={{ animationDelay: "0.3s" }}>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border/50" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-background px-4 text-sm text-muted-foreground">
-                    Ready to start your journey?
-                  </span>
-                </div>
-              </div>
-              
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link to="/auth">
                   <Button size="lg" className="group shadow-elegant min-w-[200px]">
@@ -109,10 +98,10 @@ const Hero = () => {
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <a href="#strategy-builder">
+                <a href="#tradlyte-select">
                   <Button size="lg" variant="outline" className="border-2 min-w-[200px]">
                     <Layers className="mr-2 h-5 w-5" />
-                    Try Strategy Builder
+                    Explore Strategies
                   </Button>
                 </a>
               </div>
