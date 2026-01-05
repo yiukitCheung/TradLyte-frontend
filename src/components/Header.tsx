@@ -24,18 +24,37 @@ const Header = () => {
               <a href="#market" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Market
               </a>
-              <a href="#dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Dashboard
-              </a>
-              <a href="#strategy-builder" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Strategy Builder
-              </a>
-              <a href="#goals" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Goals
-              </a>
-              <a href="#journal" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Journal
-              </a>
+              {user ? (
+                <>
+                  <Link to="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Dashboard
+                  </Link>
+                  <Link to="/strategy-builder" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Strategy Builder
+                  </Link>
+                  <Link to="/goals" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Goals
+                  </Link>
+                  <Link to="/journal" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Journal
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Dashboard
+                  </Link>
+                  <Link to="/auth" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Strategy Builder
+                  </Link>
+                  <Link to="/auth" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Goals
+                  </Link>
+                  <Link to="/auth" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Journal
+                  </Link>
+                </>
+              )}
             </>
           ) : user && (
             <>
