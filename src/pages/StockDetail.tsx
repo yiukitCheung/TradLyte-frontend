@@ -3,6 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import RegretWarning from "@/components/RegretWarning";
+import PurposeAlignmentCheck from "@/components/PurposeAlignmentCheck";
+import FocusModeToggle from "@/components/FocusModeToggle";
+import { useFocusMode } from "@/hooks/useFocusMode";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +28,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from "recharts";
+import { checkSimilarRegrets } from "@/lib/regretUtils";
 
 type TimePeriod = "1D" | "6M" | "YTD" | "1Y" | "5Y";
 
@@ -31,6 +36,14 @@ const StockDetail = () => {
   const { symbol } = useParams<{ symbol: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  
+  // Redirect if no symbol
+  useEffect(() => {
+    if (!symbol) {
+      navigate('/dashboard');
+      return;
+    }
+  }, [symbol, navigate]);
   
   const [isInPortfolio, setIsInPortfolio] = useState(false);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
@@ -43,6 +56,26 @@ const StockDetail = () => {
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'ai' | 'user'; text: string }>>([
     { role: 'ai', text: `Hi! I'm your Tradlyte AI assistant for ${symbol || "this stock"}. I can help you analyze this stock based on your portfolio and strategy. Ask me anything about entry points, risks, or how it fits your investment goals!` }
   ]);
+  const [similarRegret, setSimilarRegret] = useState<any>(null);
+  const [showPurposeCheck, setShowPurposeCheck] = useState(false);
+  const [purposeAlignment, setPurposeAlignment] = useState<{ aligned: string; reason: string } | null>(null);
+  const { focusMode } = useFocusMode();
+
+  // Helper function to get stock name
+  const getStockName = (sym: string): string => {
+    const names: Record<string, string> = {
+      AAPL: "Apple Inc.", 
+      GOOGL: "Alphabet Inc.", 
+      MSFT: "Microsoft Corporation",
+      AMZN: "Amazon.com Inc.", 
+      TSLA: "Tesla Inc.", 
+      META: "Meta Platforms Inc.", 
+      NVDA: "NVIDIA Corporation",
+      SPY: "SPDR S&P 500 ETF",
+      QQQ: "Invesco QQQ Trust",
+    };
+    return names[sym] || `${sym} Inc.`;
+  };
 
   // Generate price chart data based on period
   const generatePriceData = (period: TimePeriod) => {
@@ -76,8 +109,8 @@ const StockDetail = () => {
   const priceChange = priceData.length > 1 ? priceData[priceData.length - 1].price - priceData[0].price : 0;
   const priceChangePercent = priceData.length > 1 ? (priceChange / priceData[0].price) * 100 : 0;
 
-  // Stock data
-  const stockData = {
+  // Stock data - memoized to prevent recreation
+  const stockData = useMemo(() => ({
     symbol: symbol || "AAPL",
     name: getStockName(symbol || "AAPL"),
     price: priceData.length > 0 ? priceData[priceData.length - 1].price : 178.45,
@@ -107,7 +140,15 @@ const StockDetail = () => {
       week52Low: 164.08,
       eps: 6.05,
     },
-  };
+  }), [symbol, priceData, user]);
+
+  // Check for similar regrets after stockData is defined
+  useEffect(() => {
+    if (symbol && stockData) {
+      const regret = checkSimilarRegrets(symbol, stockData.industry);
+      setSimilarRegret(regret);
+    }
+  }, [symbol, stockData]);
 
   // Check portfolio
   useEffect(() => {
@@ -135,7 +176,7 @@ const StockDetail = () => {
   }, [user, symbol, authLoading]);
 
   const handleAddToPortfolio = async () => {
-    if (!user || !symbol) return;
+    if (!user || !symbol || !purposeAlignment) return;
     const price = parseFloat(buyInPrice);
     const qty = parseFloat(quantity);
     if (isNaN(price) || price <= 0) { toast.error("Please enter a valid buy-in price"); return; }
@@ -153,6 +194,7 @@ const StockDetail = () => {
       if (error) throw error;
       setIsInPortfolio(true);
       setAddDialogOpen(false);
+      setPurposeAlignment(null);
       toast.success(`${symbol} added to your portfolio!`);
       setBuyInPrice("");
       setQuantity("1");
@@ -162,14 +204,6 @@ const StockDetail = () => {
       setIsAdding(false);
     }
   };
-
-  function getStockName(sym: string): string {
-    const names: Record<string, string> = {
-      AAPL: "Apple Inc.", GOOGL: "Alphabet Inc.", MSFT: "Microsoft Corporation",
-      AMZN: "Amazon.com Inc.", TSLA: "Tesla Inc.", META: "Meta Platforms Inc.", NVDA: "NVIDIA Corporation",
-    };
-    return names[sym] || `${sym} Inc.`;
-  }
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-primary";
@@ -196,16 +230,40 @@ const StockDetail = () => {
 
   const timePeriods: TimePeriod[] = ["1D", "6M", "YTD", "1Y", "5Y"];
 
+  // Show loading or redirect if no symbol
+  if (!symbol) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-2xl font-semibold">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-secondary/20">
       <Header />
       <main className="flex-1 pt-24 pb-12">
         <div className="container mx-auto px-4 max-w-7xl">
-          {/* Back Button */}
-          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+          {/* Back Button & Focus Mode Toggle */}
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <FocusModeToggle />
+          </div>
+
+          {/* Regret Warning */}
+          {similarRegret && (
+            <div className="max-w-6xl mx-auto mb-6">
+              <RegretWarning 
+                regret={similarRegret}
+                onDismiss={() => setSimilarRegret(null)}
+              />
+            </div>
+          )}
 
           {/* Hero: Symbol Info + Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -222,30 +280,81 @@ const StockDetail = () => {
                         ) : isInPortfolio ? (
                           <Badge variant="outline" className="text-primary border-primary"><Check className="mr-1 h-3 w-3" />In Portfolio</Badge>
                         ) : (
-                          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                          <Dialog open={addDialogOpen} onOpenChange={(open) => {
+                            setAddDialogOpen(open);
+                            if (!open) {
+                              setPurposeAlignment(null);
+                              setBuyInPrice("");
+                              setQuantity("1");
+                            }
+                          }}>
                             <DialogTrigger asChild>
                               <Button size="sm" variant="outline"><Plus className="mr-1 h-3 w-3" />Add</Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                               <DialogHeader>
                                 <DialogTitle>Add {symbol} to Portfolio</DialogTitle>
-                                <DialogDescription>Enter your buy-in price and quantity.</DialogDescription>
+                                <DialogDescription>Let's check purpose alignment first, then enter your details.</DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="buyInPrice">Buy-in Price ($)</Label>
-                                  <Input id="buyInPrice" type="number" step="0.01" min="0" placeholder={stockData.price.toString()} value={buyInPrice} onChange={(e) => setBuyInPrice(e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="quantity">Quantity (shares)</Label>
-                                  <Input id="quantity" type="number" step="1" min="1" placeholder="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-                                </div>
+                                {!purposeAlignment ? (
+                                  <PurposeAlignmentCheck
+                                    stockSymbol={symbol || ""}
+                                    onComplete={(alignment) => {
+                                      setPurposeAlignment(alignment);
+                                    }}
+                                    onSkip={() => {
+                                      setPurposeAlignment({ aligned: 'not_sure', reason: '' });
+                                    }}
+                                  />
+                                ) : (
+                                  <>
+                                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                                      <p className="text-sm text-muted-foreground mb-1">Purpose Alignment:</p>
+                                      <p className="text-sm font-medium text-foreground capitalize">{purposeAlignment.aligned.replace('_', ' ')}</p>
+                                      {purposeAlignment.reason && (
+                                        <p className="text-xs text-muted-foreground mt-1 italic">"{purposeAlignment.reason}"</p>
+                                      )}
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="buyInPrice">Buy-in Price ($)</Label>
+                                      <Input 
+                                        id="buyInPrice" 
+                                        type="number" 
+                                        step="0.01" 
+                                        min="0" 
+                                        placeholder={stockData.price.toString()} 
+                                        value={buyInPrice} 
+                                        onChange={(e) => setBuyInPrice(e.target.value)} 
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="quantity">Quantity (shares)</Label>
+                                      <Input 
+                                        id="quantity" 
+                                        type="number" 
+                                        step="1" 
+                                        min="1" 
+                                        placeholder="1" 
+                                        value={quantity} 
+                                        onChange={(e) => setQuantity(e.target.value)} 
+                                      />
+                                    </div>
+                                  </>
+                                )}
                               </div>
                               <DialogFooter>
-                                <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
-                                <Button onClick={handleAddToPortfolio} disabled={isAdding}>
-                                  {isAdding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding...</> : "Add"}
-                                </Button>
+                                <Button variant="outline" onClick={() => {
+                                  setAddDialogOpen(false);
+                                  setPurposeAlignment(null);
+                                  setBuyInPrice("");
+                                  setQuantity("1");
+                                }}>Cancel</Button>
+                                {purposeAlignment && (
+                                  <Button onClick={handleAddToPortfolio} disabled={isAdding || !buyInPrice || !quantity}>
+                                    {isAdding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding...</> : "Add to Portfolio"}
+                                  </Button>
+                                )}
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
@@ -302,66 +411,68 @@ const StockDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Right: Minimal Chart */}
-            <Card className="shadow-card border-border/50 bg-gradient-to-br from-card to-card/50">
-              <CardContent className="pt-6 h-full flex flex-col">
-                {/* Time Period Selector */}
-                <div className="flex gap-1 mb-4">
-                  {timePeriods.map((period) => (
-                    <Button
-                      key={period}
-                      variant={selectedPeriod === period ? "default" : "ghost"}
-                      size="sm"
-                      className="text-xs px-3"
-                      onClick={() => setSelectedPeriod(period)}
-                    >
-                      {period}
-                    </Button>
-                  ))}
-                </div>
+            {/* Right: Minimal Chart (Hidden in Focus Mode) */}
+            {!focusMode && (
+              <Card className="shadow-card border-border/50 bg-gradient-to-br from-card to-card/50">
+                <CardContent className="pt-6 h-full flex flex-col">
+                  {/* Time Period Selector */}
+                  <div className="flex gap-1 mb-4">
+                    {timePeriods.map((period) => (
+                      <Button
+                        key={period}
+                        variant={selectedPeriod === period ? "default" : "ghost"}
+                        size="sm"
+                        className="text-xs px-3"
+                        onClick={() => setSelectedPeriod(period)}
+                      >
+                        {period}
+                      </Button>
+                    ))}
+                  </div>
 
-                {/* Chart */}
-                <div className="flex-1 min-h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={priceData}>
-                      <YAxis domain={['dataMin', 'dataMax']} hide />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
-                        labelFormatter={() => ''}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="price"
-                        stroke={priceChange >= 0 ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                  {/* Chart */}
+                  <div className="flex-1 min-h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={priceData}>
+                        <YAxis domain={['dataMin', 'dataMax']} hide />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                          }}
+                          formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
+                          labelFormatter={() => ''}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="price"
+                          stroke={priceChange >= 0 ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border/50">
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Market Cap</p>
-                    <p className="font-semibold text-sm">${stockData.fundamentals.marketCap}</p>
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border/50">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Market Cap</p>
+                      <p className="font-semibold text-sm">${stockData.fundamentals.marketCap}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">P/E Ratio</p>
+                      <p className="font-semibold text-sm">{stockData.fundamentals.peRatio}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">EPS</p>
+                      <p className="font-semibold text-sm">${stockData.fundamentals.eps}</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">P/E Ratio</p>
-                    <p className="font-semibold text-sm">{stockData.fundamentals.peRatio}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">EPS</p>
-                    <p className="font-semibold text-sm">${stockData.fundamentals.eps}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Main Content: AI Chat */}
@@ -443,10 +554,11 @@ const StockDetail = () => {
             </CardContent>
           </Card>
 
-          {/* Secondary: News, Indicators, Fundamentals */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* News */}
-            <Card className="shadow-card border-border/50">
+          {/* Secondary: News, Indicators, Fundamentals (Hidden in Focus Mode) */}
+          {!focusMode && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* News */}
+              <Card className="shadow-card border-border/50">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Newspaper className="h-4 w-4 text-primary" />
@@ -521,6 +633,7 @@ const StockDetail = () => {
               </CardContent>
             </Card>
           </div>
+          )}
         </div>
       </main>
       <Footer />

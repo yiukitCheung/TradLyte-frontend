@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import WisdomQuote from '@/components/WisdomQuote';
+import JournalPurposePrompt from '@/components/JournalPurposePrompt';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +62,14 @@ const Journal = () => {
       { role: 'user', text: `I want to write about: ${prompt?.label}` },
       { role: 'ai', text: `Great choice! ${prompt?.label} is important for growth. What happened today?` }
     ]);
+  };
+
+  const handlePurposePromptSelect = (promptText: string) => {
+    setChatMessages(prev => [...prev,
+      { role: 'user', text: promptText },
+      { role: 'ai', text: 'That\'s a thoughtful question. Take your time to reflect deeply on this.' }
+    ]);
+    setJournalText(promptText + '\n\n');
   };
 
   const handleStockSelect = (stock: string) => {
@@ -124,11 +134,14 @@ const Journal = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto space-y-8">
           
+          {/* Wisdom Quote */}
+          <WisdomQuote />
+
           {/* Header with Rewards */}
           <div className="flex items-center justify-between">
             <div>
@@ -254,6 +267,9 @@ const Journal = () => {
             {/* Timeline & Milestones Sidebar */}
             <div className="space-y-6">
               
+              {/* Purpose Prompts */}
+              <JournalPurposePrompt onSelectPrompt={handlePurposePromptSelect} />
+
               {/* Time Travel */}
               <Card className="shadow-card">
                 <CardHeader>

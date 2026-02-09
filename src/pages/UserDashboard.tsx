@@ -4,59 +4,130 @@ import { useAuth } from '@/hooks/useAuth';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import MarketIndex from '@/components/MarketIndex';
+import WisdomQuoteBanner from '@/components/WisdomQuoteBanner';
+import EntryPriceGrowth from '@/components/EntryPriceGrowth';
+import GrowthChart from '@/components/GrowthChart';
+import RegretSystem from '@/components/RegretSystem';
+import CooldownPrompt from '@/components/CooldownPrompt';
+import FocusModeToggle from '@/components/FocusModeToggle';
+import PurposeReminder from '@/components/PurposeReminder';
+import { useFocusMode } from '@/hooks/useFocusMode';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { 
-  TrendingUp, Target, BookOpen, Sparkles, BarChart3, PieChart, 
+  TrendingUp, Target, BookOpen, Sparkles, BarChart3, 
   ArrowUpRight, ArrowDownRight, Zap, Calendar, Trophy, Brain, 
-  LineChart, Search, Layers, ArrowRight 
+  Search, Layers, ArrowRight, TrendingDown
 } from "lucide-react";
+import { isOnboardingComplete, getUserPurpose } from '@/lib/purposeUtils';
+import { useCooldown } from '@/hooks/useCooldown';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const UserDashboard = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [portfolioItems, setPortfolioItems] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
+  const [journalStats, setJournalStats] = useState({ totalEntries: 0, weekStreak: 0, avgMood: "Neutral" });
+  const { shouldShowPrompt, enableCooldown, recordProfitableTrade, cooldownEnabled } = useCooldown();
+  const { focusMode } = useFocusMode();
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
+    } else if (!loading && user && !isOnboardingComplete()) {
+      navigate('/onboarding');
     }
   }, [user, loading, navigate]);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      try {
+        // Fetch portfolio
+        const { data: portfolioData, error: portfolioError } = await supabase
+          .from('user_portfolio')
+          .select('*')
+          .eq('user_id', user.id);
+        
+        if (portfolioError) throw portfolioError;
+        setPortfolioItems(portfolioData || []);
+        
+        // Check for profitable trades to trigger cooldown
+        if (portfolioData && portfolioData.length > 0) {
+          const hasProfit = portfolioData.some(item => 
+            item.purchase_price && 
+            item.current_price && 
+            item.current_price > item.purchase_price
+          );
+          if (hasProfit) {
+            recordProfitableTrade();
+          }
+        }
+
+        // Fetch goals
+        const { data: goalsData, error: goalsError } = await supabase
+          .from('user_goals')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (!goalsError && goalsData) {
+          setGoals(goalsData.map(goal => ({
+            ...goal,
+            progress: goal.target_amount && goal.current_amount 
+              ? Math.min(100, (parseFloat(goal.current_amount.toString()) / parseFloat(goal.target_amount.toString())) * 100)
+              : 0
+          })));
+        }
+
+        // Fetch journal stats
+        const { data: journalData, error: journalError } = await supabase
+          .from('journal_entries')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (!journalError && journalData) {
+          setJournalStats({
+            totalEntries: journalData.length,
+            weekStreak: Math.floor(journalData.length / 7),
+            avgMood: "Reflective"
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    if (user) {
+      fetchData();
+    }
+  }, [user, recordProfitableTrade]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/stock/${searchQuery.toUpperCase()}`);
+    const query = searchQuery.trim().toUpperCase();
+    if (query) {
+      navigate(`/stock/${query}`);
       setSearchQuery("");
+    } else {
+      toast.error('Please enter a stock symbol');
     }
   };
 
-  const watchlistStocks = [
-    { symbol: "AAPL", name: "Apple Inc.", price: 178.52, change: 2.34, changePercent: 1.33, score: 87 },
-    { symbol: "NVDA", name: "NVIDIA Corp.", price: 485.09, change: 12.45, changePercent: 2.63, score: 92 },
-    { symbol: "MSFT", name: "Microsoft", price: 378.91, change: -1.23, changePercent: -0.32, score: 85 },
-    { symbol: "GOOGL", name: "Alphabet", price: 141.80, change: 3.21, changePercent: 2.32, score: 78 },
-  ];
-
   const marketIndicators = [
     { name: "S&P 500", value: "4,567.23", change: "+1.2%", positive: true },
+    { name: "NASDAQ", value: "16,742.39", change: "+1.5%", positive: true },
     { name: "VIX", value: "14.32", change: "-5.4%", positive: true },
-    { name: "10Y Treasury", value: "4.21%", change: "+0.03", positive: false },
+    { name: "Gold", value: "$2,048.60", change: "+0.4%", positive: true },
+    { name: "Crude Oil", value: "$78.24", change: "-0.8%", positive: false },
   ];
-
-  const goals = [
-    { title: "Emergency Fund", progress: 85, target: "$10,000", current: "$8,500" },
-    { title: "Investment Portfolio", progress: 62, target: "$50,000", current: "$31,000" },
-  ];
-
-  const journalStats = {
-    totalEntries: 47,
-    weekStreak: 12,
-    avgMood: "Confident",
-  };
 
   if (loading) {
     return (
@@ -73,113 +144,28 @@ const UserDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="py-8">
-        <div className="container mx-auto px-4 space-y-8">
+      <main className="flex-1 py-6">
+        <div className="container mx-auto px-4 max-w-7xl space-y-6">
           
-          {/* Welcome Section */}
-          <div className="max-w-6xl mx-auto text-center space-y-2">
-            <Badge variant="secondary" className="text-sm py-1.5 px-4">
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-              Welcome back, {user.user_metadata?.full_name || 'Trader'}!
-            </Badge>
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">
-              Your Wealth Dashboard
-            </h1>
-            <p className="text-muted-foreground">
-              Track your journey with clarity and purpose
-            </p>
-          </div>
-
-          {/* Your Growth vs Market - Full Width */}
-          <div className="max-w-6xl mx-auto">
-            <MarketIndex variant="user" />
-          </div>
-
-          {/* Symbol Analytics - Wide Table Format */}
-          <div className="max-w-6xl mx-auto">
-            <Card className="shadow-elegant border-border/50 overflow-hidden relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl font-display flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-primary" />
-                      Symbol Analytics
-                    </CardTitle>
-                    <CardDescription>Your watchlist with Tradlyte scores</CardDescription>
-                  </div>
-                  <Badge className="bg-primary/10 text-primary border-0">
-                    <Zap className="w-3 h-3 mr-1" />
-                    AI-Powered
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Wide Watchlist Table */}
-                <div className="rounded-lg border border-border/50 overflow-hidden">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-muted/30 text-xs font-medium text-muted-foreground">
-                        <th className="text-left p-4">Symbol</th>
-                        <th className="text-left p-4">Company</th>
-                        <th className="text-right p-4">Price</th>
-                        <th className="text-right p-4">Change</th>
-                        <th className="text-right p-4">% Change</th>
-                        <th className="text-right p-4">Tradlyte Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {watchlistStocks.map((stock) => (
-                        <tr 
-                          key={stock.symbol} 
-                          className="border-t border-border/30 hover:bg-muted/20 transition-colors cursor-pointer"
-                          onClick={() => navigate(`/stock/${stock.symbol}`)}
-                        >
-                          <td className="p-4">
-                            <span className="font-semibold text-foreground">{stock.symbol}</span>
-                          </td>
-                          <td className="p-4 text-muted-foreground">{stock.name}</td>
-                          <td className="p-4 text-right font-mono">${stock.price.toFixed(2)}</td>
-                          <td className={`p-4 text-right font-mono ${stock.change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                            {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}
-                          </td>
-                          <td className={`p-4 text-right ${stock.change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                            <span className="inline-flex items-center gap-1">
-                              {stock.change >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                              {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
-                            </span>
-                          </td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                                  style={{ width: `${stock.score}%` }}
-                                />
-                              </div>
-                              <span className="text-sm font-semibold text-primary w-8">{stock.score}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Market Pulse - Inline */}
-                <div className="grid grid-cols-3 gap-4">
+          {/* Top Section: Market Indices + Commodities + Search Combined */}
+          <div className="space-y-4">
+            {/* Market Indices & Commodities */}
+            {!focusMode && (
+              <Card className="shadow-card border-border/50">
+                <CardContent className="py-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   {marketIndicators.map((indicator) => (
                     <div 
                       key={indicator.name} 
-                      className="p-3 rounded-lg bg-muted/30 text-center"
+                        className="text-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
-                      <div className="text-xs text-muted-foreground">{indicator.name}</div>
-                      <div className="font-semibold font-mono">{indicator.value}</div>
+                        <div className="text-xs text-muted-foreground mb-1">{indicator.name}</div>
+                        <div className="font-semibold font-mono text-sm">{indicator.value}</div>
                       <Badge 
                         variant="secondary" 
-                        className={`text-xs ${indicator.positive ? 'bg-green-500/10 text-green-600 border-0' : 'bg-red-500/10 text-red-500 border-0'}`}
+                          className={`text-xs mt-1 ${indicator.positive ? 'bg-green-500/10 text-green-600 border-0' : 'bg-red-500/10 text-red-500 border-0'}`}
                       >
                         {indicator.change}
                       </Badge>
@@ -188,65 +174,175 @@ const UserDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
+            )}
 
-          {/* Stock Search Section */}
-          <div className="max-w-6xl mx-auto">
-            <Card className="shadow-elegant border-border/50 overflow-hidden">
+            {/* Stock Search */}
+            <Card className="shadow-elegant border-border/50 bg-gradient-to-br from-primary/5 via-background to-accent/5">
               <CardContent className="py-8">
-                <div className="max-w-2xl mx-auto text-center space-y-6">
-                  <div>
-                    <h2 className="text-2xl font-display font-bold text-foreground mb-2">
-                      Discover & Analyze Stocks
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-2">
+                    Start Exploring Things That Can Achieve Your Goal Here
                     </h2>
                     <p className="text-muted-foreground">
-                      Search any symbol to get personalized recommendations based on your strategy
+                    Discover stocks and investments aligned with your financial purpose
                     </p>
                   </div>
-                  
-                  <form onSubmit={handleSearch} className="relative">
+                <form onSubmit={handleSearch} className="relative max-w-3xl mx-auto">
                     <div className="relative group">
-                      <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
                       <Input
                         type="text"
                         placeholder="Search any stock symbol (e.g., AAPL, TSLA, NVDA)"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-14 md:h-16 pl-14 pr-32 text-lg bg-background border-2 border-border hover:border-primary/50 focus:border-primary rounded-2xl transition-all"
+                      className="h-16 md:h-20 pl-14 pr-36 text-lg md:text-xl bg-background border-2 border-border hover:border-primary/50 focus:border-primary rounded-2xl transition-all shadow-lg"
                       />
                       <Button
                         type="submit"
                         size="lg"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 shadow-elegant"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 shadow-elegant h-12 px-6"
                       >
                         Analyze
                         <TrendingUp className="ml-2 h-5 w-5" />
                       </Button>
                     </div>
                   </form>
-                  
-                  {/* Quick tags */}
-                  <div className="flex flex-wrap justify-center gap-2 text-sm text-muted-foreground">
-                    <span>Try:</span>
-                    {["AAPL", "TSLA", "NVDA", "MSFT", "AMZN"].map((symbol) => (
+                <div className="flex flex-wrap justify-center gap-2 mt-6 text-sm">
+                  <span className="text-muted-foreground self-center">Popular:</span>
+                  {["AAPL", "TSLA", "NVDA", "MSFT", "AMZN", "GOOGL"].map((symbol) => (
                       <button
                         key={symbol}
-                        onClick={() => navigate(`/stock/${symbol}`)}
-                        className="px-3 py-1 rounded-full bg-muted/50 hover:bg-primary/10 hover:text-primary transition-colors"
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate(`/stock/${symbol}`);
+                      }}
+                      className="px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 hover:text-primary text-primary font-semibold transition-all border border-primary/20 hover:border-primary/40 hover:scale-105"
                       >
                         {symbol}
                       </button>
                     ))}
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
+          {/* Floating Wisdom Quote Banner */}
+          <WisdomQuoteBanner />
 
-          {/* Quick Stats Row */}
-          <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-6">
-            {/* Goals Quick View */}
+          {/* Focus Mode Toggle */}
+          <div className="flex justify-end">
+            <FocusModeToggle />
+          </div>
+
+          {/* Growth Summary Scorecard & Growth Chart Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <EntryPriceGrowth />
+            {!focusMode && <GrowthChart />}
+          </div>
+
+          {/* Cooldown Prompt */}
+          {shouldShowPrompt && cooldownEnabled && (
+            <CooldownPrompt 
+              onEnable={enableCooldown}
+              onDismiss={() => {}}
+            />
+          )}
+
+          {/* Portfolio Summary with Tradlyte Scores & % Change */}
+          {portfolioItems.length > 0 && (
+            <Card className="shadow-elegant border-border/50">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-display flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      Portfolio Summary
+                    </CardTitle>
+                    <CardDescription>Your holdings with entry-price-based performance</CardDescription>
+                  </div>
+                  <Badge className="bg-primary/10 text-primary border-0">
+                    <Zap className="w-3 h-3 mr-1" />
+                    {portfolioItems.length} Holding{portfolioItems.length !== 1 ? 's' : ''}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {portfolioItems.map((item) => {
+                    const entryPrice = item.purchase_price || 0;
+                    const currentPrice = item.current_price || entryPrice;
+                    const quantity = item.quantity || 0;
+                    const entryValue = entryPrice * quantity;
+                    const currentValue = currentPrice * quantity;
+                    const gain = currentValue - entryValue;
+                    const gainPercent = entryValue > 0 ? (gain / entryValue) * 100 : 0;
+                    // Calculate Tradlyte score based on performance (simple algorithm)
+                    const score = Math.min(100, Math.max(0, 50 + (gainPercent * 2)));
+                    
+                    return (
+                      <div 
+                        key={item.id}
+                        className="p-4 rounded-lg border border-border/50 hover:border-primary/50 transition-colors group"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <span className="font-semibold text-lg text-foreground">{item.asset_name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {item.asset_type}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Entry: <span className="font-mono">${entryPrice.toFixed(2)}</span> | 
+                              Current: <span className="font-mono">${currentPrice.toFixed(2)}</span> | 
+                              Qty: <span className="font-mono">{quantity}</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-lg font-bold ${gain >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                              {gain >= 0 ? '+' : ''}${gain.toFixed(2)}
+                            </div>
+                            <div className={`text-sm ${gainPercent >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                              {gainPercent >= 0 ? '+' : ''}{gainPercent.toFixed(2)}%
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1">
+                            <span className="text-xs text-muted-foreground">Tradlyte Score:</span>
+                            <div className="flex items-center gap-2 flex-1">
+                              <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all"
+                                  style={{ width: `${score}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-semibold text-primary w-8">{Math.round(score)}</span>
+                            </div>
+                          </div>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <RegretSystem 
+                              stockSymbol={item.asset_name}
+                              industry={item.asset_type}
+                              onRegretAdded={() => {
+                                // Refresh portfolio
+                                window.location.reload();
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Goals & Journal Side by Side with Portfolio */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Goals Section */}
             <Card className="shadow-card border-border/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -256,26 +352,44 @@ const UserDashboard = () => {
                   </CardTitle>
                   <Badge variant="outline" className="text-xs">
                     <Trophy className="w-3 h-3 mr-1" />
-                    2 Active
+                    {goals.length} Active
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {goals.map((goal) => (
-                  <div key={goal.title} className="space-y-2">
+                {goals.length > 0 ? (
+                  goals.slice(0, 2).map((goal) => (
+                    <div key={goal.id} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-foreground">{goal.title}</span>
+                        <span className="font-medium text-foreground line-clamp-1">{goal.title}</span>
                       <span className="text-muted-foreground font-mono text-xs">
-                        {goal.current} / {goal.target}
+                          ${goal.current_amount ? parseFloat(goal.current_amount.toString()).toLocaleString() : '0'} / ${goal.target_amount ? parseFloat(goal.target_amount.toString()).toLocaleString() : '0'}
                       </span>
                     </div>
                     <Progress value={goal.progress} className="h-2" />
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground mb-3">No goals yet</p>
+                    <Link to="/goals">
+                      <Button size="sm" variant="outline">
+                        <Target className="h-4 w-4 mr-2" />
+                        Create Goal
+                      </Button>
+                    </Link>
                   </div>
-                ))}
+                )}
+                <Link to="/goals">
+                  <Button variant="ghost" size="sm" className="w-full">
+                    View All Goals
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
-            {/* Journal Quick View */}
+            {/* Journal Section */}
             <Card className="shadow-card border-border/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -290,7 +404,7 @@ const UserDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="p-4 rounded-lg bg-muted/30 text-center">
                     <div className="text-2xl font-bold text-foreground">{journalStats.totalEntries}</div>
                     <div className="text-xs text-muted-foreground">Total Entries</div>
@@ -300,83 +414,26 @@ const UserDashboard = () => {
                     <div className="text-xs text-muted-foreground">Avg Mood</div>
                   </div>
                 </div>
+                <Link to="/journal">
+                  <Button variant="ghost" size="sm" className="w-full">
+                    <Brain className="h-4 w-4 mr-2" />
+                    Start Writing
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Feature Navigation Buttons */}
-          <div className="max-w-6xl mx-auto">
-            <Card className="shadow-elegant border-border/50 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden">
-              <CardContent className="py-10">
-                <div className="text-center space-y-6">
-                  <div>
-                    <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-2">
-                      Continue Your Journey
-                    </h2>
-                    <p className="text-muted-foreground max-w-xl mx-auto">
-                      Build your strategy, reflect on your progress, and achieve your goals
-                    </p>
-                  </div>
-                  
-                  <div className="grid sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-                    {/* Strategy Builder */}
-                    <Link to="/strategy-builder" className="group">
-                      <Card className="h-full border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-elegant bg-card">
-                        <CardContent className="pt-6 text-center space-y-3">
-                          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                            <Layers className="h-7 w-7 text-primary" />
-                          </div>
-                          <h3 className="font-display font-bold text-foreground">Strategy Builder</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Design & test your investment strategies
-                          </p>
-                          <Button variant="ghost" size="sm" className="text-primary group-hover:translate-x-1 transition-transform">
-                            Build Now
-                            <ArrowRight className="ml-1 h-4 w-4" />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </Link>
-
-                    {/* Goals */}
-                    <Link to="/goals" className="group">
-                      <Card className="h-full border-2 border-transparent hover:border-accent/50 transition-all duration-300 hover:shadow-elegant bg-card">
-                        <CardContent className="pt-6 text-center space-y-3">
-                          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent/10 group-hover:bg-accent/20 transition-colors">
-                            <Target className="h-7 w-7 text-accent" />
-                          </div>
-                          <h3 className="font-display font-bold text-foreground">Your Goals</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Track financial milestones & progress
-                          </p>
-                          <Button variant="ghost" size="sm" className="text-accent group-hover:translate-x-1 transition-transform">
-                            View Goals
-                            <ArrowRight className="ml-1 h-4 w-4" />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </Link>
-
-                    {/* Journal */}
-                    <Link to="/journal" className="group">
-                      <Card className="h-full border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-elegant bg-card">
-                        <CardContent className="pt-6 text-center space-y-3">
-                          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                            <Brain className="h-7 w-7 text-primary" />
-                          </div>
-                          <h3 className="font-display font-bold text-foreground">Reflection Journal</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Capture insights & trading mindset
-                          </p>
-                          <Button variant="ghost" size="sm" className="text-primary group-hover:translate-x-1 transition-transform">
-                            Start Writing
-                            <ArrowRight className="ml-1 h-4 w-4" />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </div>
-                </div>
+            {/* Purpose Reminder */}
+            <Card className="shadow-card border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-display flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Your Purpose
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PurposeReminder />
               </CardContent>
             </Card>
           </div>

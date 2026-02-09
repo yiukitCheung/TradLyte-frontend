@@ -16,7 +16,22 @@ const Auth = () => {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard');
+      // Check if onboarding is complete
+      const onboardingComplete = localStorage.getItem('tradlyte_purpose');
+      if (onboardingComplete) {
+        try {
+          const purpose = JSON.parse(onboardingComplete);
+          if (purpose.onboardingComplete) {
+            navigate('/dashboard');
+          } else {
+            navigate('/onboarding');
+          }
+        } catch {
+          navigate('/onboarding');
+        }
+      } else {
+        navigate('/onboarding');
+      }
     }
   }, [user, loading, navigate]);
 
@@ -51,7 +66,7 @@ const Auth = () => {
       toast.error(error.message);
     } else {
       toast.success('Account created successfully!');
-      navigate('/dashboard');
+      navigate('/onboarding');
     }
     setIsSubmitting(false);
   };

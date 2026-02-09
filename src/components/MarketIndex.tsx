@@ -1,16 +1,34 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Sparkles, User } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MarketIndexProps {
   variant?: 'default' | 'user';
+  hasPortfolio?: boolean;
 }
 
-const MarketIndex = ({ variant = 'default' }: MarketIndexProps) => {
+const MarketIndex = ({ variant = 'default', hasPortfolio = false }: MarketIndexProps) => {
   const isUserMode = variant === 'user';
   const primaryLabel = isUserMode ? 'Your Portfolio' : 'Tradlyte Pick';
+  
+  // If user mode but no portfolio, show empty state
+  if (isUserMode && !hasPortfolio) {
+    return (
+      <Card className="shadow-card border-border/50">
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">
+              Add stocks to your portfolio to see your growth vs market performance
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   // Generate 3 years of monthly data with realistic market fluctuations
   const generateChartData = () => {

@@ -23,13 +23,13 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
       {/* Hero Section with Stock Search */}
       <Hero />
 
-      <main className="py-8">
+      <main className="flex-1 py-8">
         <div className="container mx-auto px-4 space-y-16">
           {/* Tradlyte Select - Strategy Showcase */}
           <section id="tradlyte-select" className="max-w-6xl mx-auto">

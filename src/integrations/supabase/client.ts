@@ -5,8 +5,29 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+// Debug: Check if variables are loaded
+console.log('Environment check:', {
+  hasUrl: !!SUPABASE_URL,
+  hasKey: !!SUPABASE_PUBLISHABLE_KEY,
+  urlPreview: SUPABASE_URL ? SUPABASE_URL.substring(0, 30) + '...' : 'MISSING'
+});
+
+// Validate before creating client
+if (!SUPABASE_URL) {
+  throw new Error(
+    'Missing VITE_SUPABASE_URL. Please check your .env file.\n' +
+    'Make sure:\n' +
+    '1. .env file is in project root (same folder as package.json)\n' +
+    '2. Variable is named VITE_SUPABASE_URL\n' +
+    '3. You restarted the dev server after creating .env'
+  );
+}
+
+if (!SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error(
+    'Missing VITE_SUPABASE_PUBLISHABLE_KEY. Please check your .env file.'
+  );
+}
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {

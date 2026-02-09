@@ -11,6 +11,7 @@ import Goals from "./pages/Goals";
 import Journal from "./pages/Journal";
 import StockDetail from "./pages/StockDetail";
 import NotFound from "./pages/NotFound";
+import PurposeOnboarding from "./components/onboarding/PurposeOnboarding";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/onboarding" element={<PurposeOnboarding />} />
           <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/strategy-builder" element={<StrategyBuilder />} />
           <Route path="/goals" element={<Goals />} />

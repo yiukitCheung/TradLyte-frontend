@@ -2,14 +2,21 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine } from "recharts";
-import { TrendingUp, AlertCircle, ChevronDown } from "lucide-react";
+import { TrendingUp, AlertCircle, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Condition } from "@/pages/StrategyBuilder";
+
+export interface StrategySummary {
+  title: string;
+  description: string;
+}
 
 interface PerformanceChartProps {
   isSimulating: boolean;
   conditions: Condition[];
+  strategySummary?: StrategySummary | null;
 }
 
 const stockOptions = [
@@ -117,6 +124,24 @@ const generateChartData = (stockBaseReturn: number, strategyMultiplier: number) 
   return data;
 };
 
+// Approximate Sharpe Ratio (annualized): (return - riskFree) / volatility. Using chart series for strategy.
+const calculateSharpeRatio = (chartData: { market: number; strategy: number }[], riskFreePerAnnum = 0.02) => {
+  if (chartData.length < 2) return 0;
+  const monthlyRf = riskFreePerAnnum / 12;
+  const returns: number[] = [];
+  for (let i = 1; i < chartData.length; i++) {
+    const prev = chartData[i - 1].strategy;
+    const curr = chartData[i].strategy;
+    returns.push((curr - prev) / prev);
+  }
+  const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((s, r) => s + (r - avgReturn) ** 2, 0) / returns.length;
+  const vol = Math.sqrt(variance) || 0.001;
+  const excessReturn = avgReturn - monthlyRf;
+  const sharpeMonthly = vol ? excessReturn / vol : 0;
+  return Math.round(sharpeMonthly * Math.sqrt(12) * 100) / 100; // annualized
+};
+
 const chartConfig = {
   market: {
     label: "Market Index",
@@ -128,7 +153,7 @@ const chartConfig = {
   },
 };
 
-const PerformanceChart = ({ isSimulating, conditions }: PerformanceChartProps) => {
+const PerformanceChart = ({ isSimulating, conditions, strategySummary }: PerformanceChartProps) => {
   const [selectedStock, setSelectedStock] = useState("all");
   const [chartKey, setChartKey] = useState(0);
   
@@ -150,6 +175,7 @@ const PerformanceChart = ({ isSimulating, conditions }: PerformanceChartProps) =
   const finalMarket = chartData[chartData.length - 1].market;
   const finalStrategy = chartData[chartData.length - 1].strategy;
   const outperformance = ((finalStrategy - finalMarket) / finalMarket * 100).toFixed(1);
+  const sharpeRatio = useMemo(() => calculateSharpeRatio(chartData), [chartData]);
   
   const hasConditions = conditions.length > 0;
 
@@ -166,6 +192,30 @@ const PerformanceChart = ({ isSimulating, conditions }: PerformanceChartProps) =
               <CardDescription className="text-base">See how your strategy compares to the market</CardDescription>
             </div>
           </div>
+          
+          {/* Strategy hover box on the side */}
+          {strategySummary && (
+            <HoverCard openDelay={200} closeDelay={100}>
+              <HoverCardTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <Layers className="h-4 w-4" />
+                  Strategy
+                </button>
+              </HoverCardTrigger>
+              <HoverCardContent side="left" align="start" className="w-80">
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-foreground flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-primary" />
+                    {strategySummary.title}
+                  </h4>
+                  <p className="text-sm text-muted-foreground leading-snug">{strategySummary.description}</p>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
           
           <div className="flex items-center gap-4">
             {/* Stock Selector */}
@@ -269,7 +319,7 @@ const PerformanceChart = ({ isSimulating, conditions }: PerformanceChartProps) =
             </ChartContainer>
 
             {/* Key Metrics Row */}
-            <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="mt-6 grid grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="p-4 rounded-xl bg-muted/50 border border-border">
                 <p className="text-xs text-muted-foreground">Market Final Value</p>
                 <p className="text-2xl font-bold text-foreground">${finalMarket}</p>
@@ -277,6 +327,10 @@ const PerformanceChart = ({ isSimulating, conditions }: PerformanceChartProps) =
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                 <p className="text-xs text-muted-foreground">Strategy Final Value</p>
                 <p className="text-2xl font-bold text-primary">${finalStrategy}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-muted/50 border border-border">
+                <p className="text-xs text-muted-foreground">Sharpe Ratio</p>
+                <p className="text-2xl font-bold text-foreground">{sharpeRatio}</p>
               </div>
               <div className="p-4 rounded-xl bg-muted/50 border border-border">
                 <p className="text-xs text-muted-foreground">Active Conditions</p>

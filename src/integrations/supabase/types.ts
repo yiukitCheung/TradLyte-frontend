@@ -98,6 +98,7 @@ export type Database = {
           current_amount: number | null
           description: string | null
           id: string
+          milestones: Json | null
           status: string | null
           target_amount: number | null
           target_date: string | null
@@ -110,6 +111,7 @@ export type Database = {
           current_amount?: number | null
           description?: string | null
           id?: string
+          milestones?: Json | null
           status?: string | null
           target_amount?: number | null
           target_date?: string | null
@@ -122,6 +124,7 @@ export type Database = {
           current_amount?: number | null
           description?: string | null
           id?: string
+          milestones?: Json | null
           status?: string | null
           target_amount?: number | null
           target_date?: string | null
