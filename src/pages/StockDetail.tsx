@@ -31,6 +31,184 @@ import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 import { checkSimilarRegrets } from "@/lib/regretUtils";
 
 type TimePeriod = "1D" | "6M" | "YTD" | "1Y" | "5Y";
+type OhlcvInterval = "1d" | "1h" | "15m" | "5m" | "1m";
+
+interface MarketQuoteItem {
+  symbol: string;
+  name: string | null;
+  industry: string | null;
+  market_cap: number | null;
+  type: string | null;
+  primary_exchange: string | null;
+  as_of_date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+}
+
+interface MarketQuoteResponse {
+  data: MarketQuoteItem;
+}
+
+interface OhlcvItem {
+  symbol: string;
+  interval: string;
+  timestamp: string;
+  trading_date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+}
+
+interface OhlcvResponse {
+  data: OhlcvItem[];
+}
+
+interface MarketReturnsResponse {
+  data: {
+    symbol: string;
+    returns: Record<string, number | null>;
+  };
+}
+
+interface PricePoint {
+  date: string;
+  price: number;
+}
+
+interface CorrelatedIndicator {
+  name: string;
+  symbol: string;
+  price: number | null;
+  change: number | null;
+}
+
+const MARKET_API_BASE_URL =
+  import.meta.env.VITE_MARKET_API_BASE_URL ||
+  "https://8p52xermu7.execute-api.ca-west-1.amazonaws.com/v1";
+const MARKET_API_KEY =
+  import.meta.env.VITE_MARKET_API_KEY || import.meta.env.VITE_SERVING_API_KEY || "";
+
+const CORRELATED_INDICATOR_SYMBOLS: Array<{ name: string; symbol: string }> = [
+  { name: "S&P 500", symbol: "SPY" },
+  { name: "NASDAQ", symbol: "QQQ" },
+  { name: "Dow Jones", symbol: "DJIA" },
+  { name: "Gold", symbol: "GLD" },
+  { name: "Silver", symbol: "SLV" },
+  { name: "Crude Oil", symbol: "USO" },
+];
+
+const formatDate = (date: Date) => date.toISOString().slice(0, 10);
+
+const mapPeriodToOhlcvParams = (period: TimePeriod) => {
+  const endDate = new Date();
+  let startDate = new Date(endDate);
+  let interval: OhlcvInterval = "1d";
+  let limit = 400;
+
+  switch (period) {
+    case "1D":
+      interval = "1h";
+      startDate.setDate(endDate.getDate() - 2);
+      limit = 72;
+      break;
+    case "6M":
+      interval = "1d";
+      startDate.setDate(endDate.getDate() - 180);
+      limit = 220;
+      break;
+    case "YTD":
+      interval = "1d";
+      startDate = new Date(endDate.getFullYear(), 0, 1);
+      limit = 300;
+      break;
+    case "1Y":
+      interval = "1d";
+      startDate.setDate(endDate.getDate() - 365);
+      limit = 420;
+      break;
+    case "5Y":
+      interval = "1d";
+      startDate.setDate(endDate.getDate() - 365 * 5);
+      limit = 2000;
+      break;
+  }
+
+  return {
+    interval,
+    startDate: formatDate(startDate),
+    endDate: formatDate(endDate),
+    limit,
+  };
+};
+
+const formatMarketCap = (value: number | null) => {
+  if (value === null || value === undefined) return "N/A";
+  if (value >= 1_000_000_000_000) return `${(value / 1_000_000_000_000).toFixed(2)}T`;
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  return value.toLocaleString();
+};
+
+const formatCurrency = (value: number | null, digits = 2) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
+  return `$${value.toFixed(digits)}`;
+};
+
+const formatInteger = (value: number | null) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
+  return value.toLocaleString();
+};
+
+const toSafeNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const generateFallbackPriceData = (period: TimePeriod): PricePoint[] => {
+  const data: PricePoint[] = [];
+  let days = 30;
+  switch (period) {
+    case "1D":
+      days = 1;
+      break;
+    case "6M":
+      days = 180;
+      break;
+    case "YTD":
+      days = Math.floor(
+        (new Date().getTime() - new Date(new Date().getFullYear(), 0, 1).getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      break;
+    case "1Y":
+      days = 365;
+      break;
+    case "5Y":
+      days = 1825;
+      break;
+  }
+
+  let price = 165;
+  const interval = period === "1D" ? 24 : Math.min(days, 60);
+  const step = Math.max(1, Math.floor(days / interval));
+
+  for (let i = days; i >= 0; i -= step) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    price = price + (Math.random() - 0.48) * (period === "5Y" ? 5 : 2);
+    data.push({
+      date: date.toISOString(),
+      price: parseFloat(Math.max(100, price).toFixed(2)),
+    });
+  }
+  return data;
+};
 
 const StockDetail = () => {
   const { symbol } = useParams<{ symbol: string }>();
@@ -60,6 +238,13 @@ const StockDetail = () => {
   const [showPurposeCheck, setShowPurposeCheck] = useState(false);
   const [purposeAlignment, setPurposeAlignment] = useState<{ aligned: string; reason: string } | null>(null);
   const { focusMode } = useFocusMode();
+  const [quoteData, setQuoteData] = useState<MarketQuoteItem | null>(null);
+  const [priceData, setPriceData] = useState<PricePoint[]>([]);
+  const [marketLoading, setMarketLoading] = useState(true);
+  const [usingFallbackData, setUsingFallbackData] = useState(false);
+  const [correlatedIndicators, setCorrelatedIndicators] = useState<CorrelatedIndicator[]>(
+    CORRELATED_INDICATOR_SYMBOLS.map((item) => ({ ...item, price: null, change: null }))
+  );
 
   // Helper function to get stock name
   const getStockName = (sym: string): string => {
@@ -77,70 +262,164 @@ const StockDetail = () => {
     return names[sym] || `${sym} Inc.`;
   };
 
-  // Generate price chart data based on period
-  const generatePriceData = (period: TimePeriod) => {
-    const data = [];
-    let days = 30;
-    switch (period) {
-      case "1D": days = 1; break;
-      case "6M": days = 180; break;
-      case "YTD": days = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)); break;
-      case "1Y": days = 365; break;
-      case "5Y": days = 1825; break;
-    }
-    
-    let price = 165;
-    const interval = period === "1D" ? 24 : Math.min(days, 60);
-    const step = Math.max(1, Math.floor(days / interval));
-    
-    for (let i = days; i >= 0; i -= step) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      price = price + (Math.random() - 0.48) * (period === "5Y" ? 5 : 2);
-      data.push({
-        date: date.toISOString(),
-        price: parseFloat(Math.max(100, price).toFixed(2)),
-      });
-    }
-    return data;
-  };
+  // Fetch real market quote + chart data from serving API
+  useEffect(() => {
+    if (!symbol) return;
 
-  const priceData = useMemo(() => generatePriceData(selectedPeriod), [selectedPeriod]);
+    const controller = new AbortController();
+    const fetchMarketData = async () => {
+      setMarketLoading(true);
+      try {
+        setUsingFallbackData(false);
+        const quoteUrl = `${MARKET_API_BASE_URL}/market/quote/${symbol.toUpperCase()}`;
+        const ohlcvParams = mapPeriodToOhlcvParams(selectedPeriod);
+        const ohlcvUrl = new URL(`${MARKET_API_BASE_URL}/market/ohlcv/${symbol.toUpperCase()}`);
+        ohlcvUrl.searchParams.set("interval", ohlcvParams.interval);
+        ohlcvUrl.searchParams.set("start_date", ohlcvParams.startDate);
+        ohlcvUrl.searchParams.set("end_date", ohlcvParams.endDate);
+        ohlcvUrl.searchParams.set("limit", String(ohlcvParams.limit));
+        ohlcvUrl.searchParams.set("sort", "asc");
+
+        const headers: HeadersInit = {};
+        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
+
+        const [quoteRes, ohlcvRes] = await Promise.all([
+          fetch(quoteUrl, { headers, signal: controller.signal }),
+          fetch(ohlcvUrl.toString(), { headers, signal: controller.signal }),
+        ]);
+
+        if (!quoteRes.ok) throw new Error(`Quote API failed (${quoteRes.status})`);
+        if (!ohlcvRes.ok) throw new Error(`OHLCV API failed (${ohlcvRes.status})`);
+
+        const quoteJson = (await quoteRes.json()) as MarketQuoteResponse;
+        const ohlcvJson = (await ohlcvRes.json()) as OhlcvResponse;
+
+        const mappedPriceData = (ohlcvJson.data || [])
+          .filter((p) => p.close !== null)
+          .map((p) => ({
+            date: p.timestamp || p.trading_date,
+            price: Number(p.close),
+          }));
+
+        if (mappedPriceData.length === 0) {
+          throw new Error("OHLCV API returned no data");
+        }
+
+        setQuoteData(quoteJson.data);
+        setPriceData(
+          (ohlcvJson.data || [])
+            .filter((p) => p.close !== null)
+            .map((p) => ({
+              date: p.timestamp || p.trading_date,
+              price: Number(p.close),
+            }))
+        );
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("Error fetching market data:", error);
+        setUsingFallbackData(true);
+        setQuoteData(null);
+        setPriceData(generateFallbackPriceData(selectedPeriod));
+        toast.error("Live market API unavailable. Showing fallback data.");
+      } finally {
+        setMarketLoading(false);
+      }
+    };
+
+    fetchMarketData();
+    return () => controller.abort();
+  }, [symbol, selectedPeriod]);
+
+  // Fetch correlated indicators (SPY, QQQ, DJIA, GLD, SLV, USO)
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchCorrelatedIndicators = async () => {
+      try {
+        const headers: HeadersInit = {};
+        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
+
+        const rows = await Promise.all(
+          CORRELATED_INDICATOR_SYMBOLS.map(async ({ name, symbol: indexSymbol }) => {
+            try {
+              const [quoteRes, returnsRes] = await Promise.all([
+                fetch(`${MARKET_API_BASE_URL}/market/quote/${indexSymbol}`, {
+                  headers,
+                  signal: controller.signal,
+                }),
+                fetch(`${MARKET_API_BASE_URL}/market/returns/${indexSymbol}?horizons=1`, {
+                  headers,
+                  signal: controller.signal,
+                }),
+              ]);
+
+              if (!quoteRes.ok || !returnsRes.ok) {
+                return { name, symbol: indexSymbol, price: null, change: null };
+              }
+
+              const quoteJson = (await quoteRes.json()) as MarketQuoteResponse;
+              const returnsJson = (await returnsRes.json()) as MarketReturnsResponse;
+              return {
+                name,
+                symbol: indexSymbol,
+                price: toSafeNumber(quoteJson.data?.close),
+                change: toSafeNumber(returnsJson.data?.returns?.["1d"]),
+              };
+            } catch {
+              return { name, symbol: indexSymbol, price: null, change: null };
+            }
+          })
+        );
+
+        setCorrelatedIndicators(rows);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("Error fetching correlated indicators:", error);
+      }
+    };
+
+    fetchCorrelatedIndicators();
+    return () => controller.abort();
+  }, [symbol]);
+
   const priceChange = priceData.length > 1 ? priceData[priceData.length - 1].price - priceData[0].price : 0;
   const priceChangePercent = priceData.length > 1 ? (priceChange / priceData[0].price) * 100 : 0;
 
   // Stock data - memoized to prevent recreation
-  const stockData = useMemo(() => ({
-    symbol: symbol || "AAPL",
-    name: getStockName(symbol || "AAPL"),
-    price: priceData.length > 0 ? priceData[priceData.length - 1].price : 178.45,
-    change: priceChange,
-    changePercent: priceChangePercent,
-    industry: "Technology",
-    sector: "Consumer Electronics",
+  const stockData = useMemo(() => {
+    const quoteOpen = toSafeNumber(quoteData?.open);
+    const quoteClose = toSafeNumber(quoteData?.close);
+    const quoteHigh = toSafeNumber(quoteData?.high);
+    const quoteLow = toSafeNumber(quoteData?.low);
+    const quoteVolume = toSafeNumber(quoteData?.volume);
+    const quoteMarketCap = toSafeNumber(quoteData?.market_cap);
+
+    return {
+      symbol: symbol || "AAPL",
+      name: quoteData?.name || getStockName(symbol || "AAPL"),
+      price: quoteClose ?? (priceData.length > 0 ? priceData[priceData.length - 1].price : 178.45),
+      change: priceChange,
+      changePercent: priceChangePercent,
+      industry: quoteData?.industry || "Unknown",
+      sector: quoteData?.type || "Common Stock",
     recommendationScore: user ? 87 : 72,
     strategyName: user ? "Growth & Value Mix" : "Default Strategy",
     portfolioGrowth: user ? "+12.4%" : null,
-    correlatedIndices: [
-      { name: "S&P 500", correlation: 0.92, change: 1.2, price: "$5,234.18" },
-      { name: "NASDAQ", correlation: 0.89, change: 1.5, price: "$16,742.39" },
-      { name: "Crude Oil (WTI)", correlation: 0.42, change: -0.8, price: "$78.24" },
-      { name: "Gold", correlation: -0.35, change: 0.4, price: "$2,048.60" },
-    ],
+    correlatedIndices: correlatedIndicators,
     news: [
       { title: `${symbol || "AAPL"} Reports Strong Q4 Earnings`, source: "Reuters", time: "2h ago" },
       { title: `Analysts Upgrade ${symbol || "AAPL"} Following Product Launch`, source: "Bloomberg", time: "5h ago" },
       { title: `${symbol || "AAPL"} Expands AI Capabilities`, source: "CNBC", time: "1d ago" },
     ],
     fundamentals: {
-      marketCap: "2.8T",
-      peRatio: 29.5,
-      dividendYield: "0.52%",
-      week52High: 199.62,
-      week52Low: 164.08,
-      eps: 6.05,
+      marketCap: formatMarketCap(quoteMarketCap),
+      open: quoteOpen,
+      close: quoteClose,
+      dayHigh: quoteHigh ?? (priceData.length > 0 ? Math.max(...priceData.map((p) => p.price)) : null),
+      dayLow: quoteLow ?? (priceData.length > 0 ? Math.min(...priceData.map((p) => p.price)) : null),
+      volume: quoteVolume,
     },
-  }), [symbol, priceData, user]);
+    };
+  }, [symbol, quoteData, priceData, user, priceChange, priceChangePercent, correlatedIndicators]);
 
   // Check for similar regrets after stockData is defined
   useEffect(() => {
@@ -223,7 +502,7 @@ const StockDetail = () => {
     setChatMessages(prev => [
       ...prev,
       { role: 'user', text: chatInput },
-      { role: 'ai', text: `Based on your ${stockData.strategyName} strategy and current market conditions, ${symbol} shows strong momentum. The stock aligns well with your growth objectives. Consider the current P/E of ${stockData.fundamentals.peRatio} and recent positive earnings surprises.` }
+      { role: 'ai', text: `Based on your ${stockData.strategyName} strategy and current market conditions, ${symbol} shows strong momentum. The stock aligns well with your growth objectives. Consider current trend, volume, and day range before entering.` }
     ]);
     setChatInput("");
   };
@@ -362,6 +641,11 @@ const StockDetail = () => {
                       )}
                     </div>
                     <p className="text-lg text-muted-foreground mb-4">{stockData.name}</p>
+                    {usingFallbackData && (
+                      <p className="text-xs text-amber-600 mb-3">
+                        Live feed unavailable, showing fallback data.
+                      </p>
+                    )}
                     <div className="flex items-center gap-2 mb-4">
                       <Building className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">{stockData.industry}</span>
@@ -432,6 +716,12 @@ const StockDetail = () => {
 
                   {/* Chart */}
                   <div className="flex-1 min-h-[200px]">
+                    {marketLoading ? (
+                      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Loading market data...
+                      </div>
+                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={priceData}>
                         <YAxis domain={['dataMin', 'dataMax']} hide />
@@ -453,21 +743,22 @@ const StockDetail = () => {
                         />
                       </LineChart>
                     </ResponsiveContainer>
+                    )}
                   </div>
 
                   {/* Quick Stats */}
                   <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border/50">
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground">Market Cap</p>
-                      <p className="font-semibold text-sm">${stockData.fundamentals.marketCap}</p>
+                      <p className="text-xs text-muted-foreground">Open</p>
+                      <p className="font-semibold text-sm">{formatCurrency(stockData.fundamentals.open)}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground">P/E Ratio</p>
-                      <p className="font-semibold text-sm">{stockData.fundamentals.peRatio}</p>
+                      <p className="text-xs text-muted-foreground">Close</p>
+                      <p className="font-semibold text-sm">{formatCurrency(stockData.fundamentals.close)}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground">EPS</p>
-                      <p className="font-semibold text-sm">${stockData.fundamentals.eps}</p>
+                      <p className="text-xs text-muted-foreground">Volume</p>
+                      <p className="font-semibold text-sm">{formatInteger(stockData.fundamentals.volume)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -595,10 +886,12 @@ const StockDetail = () => {
                     <div key={index.name} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
                       <div>
                         <p className="font-medium text-sm">{index.name}</p>
-                        <p className="text-xs text-muted-foreground">{index.price}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {index.symbol} · {formatCurrency(index.price)}
+                        </p>
                       </div>
-                      <span className={`text-sm font-semibold ${index.change >= 0 ? "text-primary" : "text-destructive"}`}>
-                        {index.change >= 0 ? "+" : ""}{index.change.toFixed(1)}%
+                      <span className={`text-sm font-semibold ${(index.change ?? 0) >= 0 ? "text-primary" : "text-destructive"}`}>
+                        {index.change === null ? "N/A" : `${index.change >= 0 ? "+" : ""}${index.change.toFixed(2)}%`}
                       </span>
                     </div>
                   ))}
@@ -614,20 +907,20 @@ const StockDetail = () => {
               <CardContent>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-secondary/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground">52W High</p>
-                    <p className="font-semibold text-sm">${stockData.fundamentals.week52High}</p>
+                    <p className="text-xs text-muted-foreground">Day High</p>
+                    <p className="font-semibold text-sm">{formatCurrency(stockData.fundamentals.dayHigh)}</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground">52W Low</p>
-                    <p className="font-semibold text-sm">${stockData.fundamentals.week52Low}</p>
+                    <p className="text-xs text-muted-foreground">Day Low</p>
+                    <p className="font-semibold text-sm">{formatCurrency(stockData.fundamentals.dayLow)}</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Dividend</p>
-                    <p className="font-semibold text-sm">{stockData.fundamentals.dividendYield}</p>
+                    <p className="text-xs text-muted-foreground">Open</p>
+                    <p className="font-semibold text-sm">{formatCurrency(stockData.fundamentals.open)}</p>
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-lg">
                     <p className="text-xs text-muted-foreground">Market Cap</p>
-                    <p className="font-semibold text-sm">${stockData.fundamentals.marketCap}</p>
+                    <p className="font-semibold text-sm">{stockData.fundamentals.marketCap}</p>
                   </div>
                 </div>
               </CardContent>

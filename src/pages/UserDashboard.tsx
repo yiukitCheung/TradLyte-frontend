@@ -27,6 +27,53 @@ import { useCooldown } from '@/hooks/useCooldown';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+interface MarketQuoteItem {
+  symbol: string;
+  close: number | null;
+}
+
+interface MarketQuoteResponse {
+  data: MarketQuoteItem;
+}
+
+interface MarketReturnsResponse {
+  data: {
+    returns: Record<string, number | null>;
+  };
+}
+
+interface DashboardIndex {
+  name: string;
+  symbol: string;
+  value: string;
+  change: string;
+  positive: boolean;
+}
+
+const MARKET_API_BASE_URL =
+  import.meta.env.VITE_MARKET_API_BASE_URL ||
+  "https://8p52xermu7.execute-api.ca-west-1.amazonaws.com/v1";
+const MARKET_API_KEY =
+  import.meta.env.VITE_MARKET_API_KEY || import.meta.env.VITE_SERVING_API_KEY || "";
+
+const DASHBOARD_INDEX_SPECS: Array<{ name: string; symbol: string; isCurrency?: boolean }> = [
+  { name: "S&P 500", symbol: "SPY" },
+  { name: "NASDAQ", symbol: "QQQ" },
+  { name: "Dow Jones", symbol: "DJIA" },
+  { name: "Gold", symbol: "GLD", isCurrency: true },
+  { name: "Crude Oil", symbol: "USO", isCurrency: true },
+];
+
+const formatIndexValue = (value: number | null, isCurrency?: boolean) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
+  return isCurrency ? `$${value.toFixed(2)}` : value.toFixed(2);
+};
+
+const formatIndexChange = (value: number | null) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+};
+
 const UserDashboard = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -34,6 +81,13 @@ const UserDashboard = () => {
   const [portfolioItems, setPortfolioItems] = useState<any[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
   const [journalStats, setJournalStats] = useState({ totalEntries: 0, weekStreak: 0, avgMood: "Neutral" });
+  const [marketIndicators, setMarketIndicators] = useState<DashboardIndex[]>([
+    { name: "S&P 500", symbol: "SPY", value: "N/A", change: "N/A", positive: true },
+    { name: "NASDAQ", symbol: "QQQ", value: "N/A", change: "N/A", positive: true },
+    { name: "Dow Jones", symbol: "DJIA", value: "N/A", change: "N/A", positive: true },
+    { name: "Gold", symbol: "GLD", value: "N/A", change: "N/A", positive: true },
+    { name: "Crude Oil", symbol: "USO", value: "N/A", change: "N/A", positive: true },
+  ]);
   const { shouldShowPrompt, enableCooldown, recordProfitableTrade, cooldownEnabled } = useCooldown();
   const { focusMode } = useFocusMode();
 
@@ -110,6 +164,72 @@ const UserDashboard = () => {
     }
   }, [user, recordProfitableTrade]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchTopIndices = async () => {
+      try {
+        const headers: HeadersInit = {};
+        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
+
+        const rows = await Promise.all(
+          DASHBOARD_INDEX_SPECS.map(async (spec) => {
+            try {
+              const [quoteRes, returnsRes] = await Promise.all([
+                fetch(`${MARKET_API_BASE_URL}/market/quote/${spec.symbol}`, {
+                  headers,
+                  signal: controller.signal,
+                }),
+                fetch(`${MARKET_API_BASE_URL}/market/returns/${spec.symbol}?horizons=1`, {
+                  headers,
+                  signal: controller.signal,
+                }),
+              ]);
+
+              if (!quoteRes.ok || !returnsRes.ok) {
+                return {
+                  name: spec.name,
+                  symbol: spec.symbol,
+                  value: "N/A",
+                  change: "N/A",
+                  positive: true,
+                };
+              }
+
+              const quoteJson = (await quoteRes.json()) as MarketQuoteResponse;
+              const returnsJson = (await returnsRes.json()) as MarketReturnsResponse;
+              const close = Number(quoteJson.data?.close);
+              const change1d = Number(returnsJson.data?.returns?.["1d"]);
+
+              return {
+                name: spec.name,
+                symbol: spec.symbol,
+                value: formatIndexValue(Number.isFinite(close) ? close : null, spec.isCurrency),
+                change: formatIndexChange(Number.isFinite(change1d) ? change1d : null),
+                positive: Number.isFinite(change1d) ? change1d >= 0 : true,
+              };
+            } catch {
+              return {
+                name: spec.name,
+                symbol: spec.symbol,
+                value: "N/A",
+                change: "N/A",
+                positive: true,
+              };
+            }
+          })
+        );
+
+        setMarketIndicators(rows);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("Error fetching dashboard indices:", error);
+      }
+    };
+
+    fetchTopIndices();
+    return () => controller.abort();
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim().toUpperCase();
@@ -120,14 +240,6 @@ const UserDashboard = () => {
       toast.error('Please enter a stock symbol');
     }
   };
-
-  const marketIndicators = [
-    { name: "S&P 500", value: "4,567.23", change: "+1.2%", positive: true },
-    { name: "NASDAQ", value: "16,742.39", change: "+1.5%", positive: true },
-    { name: "VIX", value: "14.32", change: "-5.4%", positive: true },
-    { name: "Gold", value: "$2,048.60", change: "+0.4%", positive: true },
-    { name: "Crude Oil", value: "$78.24", change: "-0.8%", positive: false },
-  ];
 
   if (loading) {
     return (
@@ -158,7 +270,7 @@ const UserDashboard = () => {
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   {marketIndicators.map((indicator) => (
                     <div 
-                      key={indicator.name} 
+                      key={indicator.symbol} 
                         className="text-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
                         <div className="text-xs text-muted-foreground mb-1">{indicator.name}</div>
