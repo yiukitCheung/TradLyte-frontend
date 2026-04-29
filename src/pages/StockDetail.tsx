@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 import { checkSimilarRegrets } from "@/lib/regretUtils";
+import { fetchMassiveNewsForTicker, type NewsListItem } from "@/lib/massiveNews";
 
 type TimePeriod = "1D" | "6M" | "YTD" | "1Y" | "5Y";
 type OhlcvInterval = "1d" | "1h" | "15m" | "5m" | "1m";
@@ -66,13 +67,6 @@ interface OhlcvItem {
 
 interface OhlcvResponse {
   data: OhlcvItem[];
-}
-
-interface MarketReturnsResponse {
-  data: {
-    symbol: string;
-    returns: Record<string, number | null>;
-  };
 }
 
 interface PricePoint {
@@ -170,6 +164,11 @@ const toSafeNumber = (value: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+const calculateDayOpenClosePercent = (open: number | null, close: number | null) => {
+  if (open === null || close === null || open === 0) return null;
+  return ((close - open) / open) * 100;
+};
+
 const generateFallbackPriceData = (period: TimePeriod): PricePoint[] => {
   const data: PricePoint[] = [];
   let days = 30;
@@ -245,6 +244,9 @@ const StockDetail = () => {
   const [correlatedIndicators, setCorrelatedIndicators] = useState<CorrelatedIndicator[]>(
     CORRELATED_INDICATOR_SYMBOLS.map((item) => ({ ...item, price: null, change: null }))
   );
+  const [newsItems, setNewsItems] = useState<NewsListItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState<string | null>(null);
 
   // Helper function to get stock name
   const getStockName = (sym: string): string => {
@@ -330,39 +332,33 @@ const StockDetail = () => {
     return () => controller.abort();
   }, [symbol, selectedPeriod]);
 
-  // Fetch correlated indicators (SPY, QQQ, DJIA, GLD, SLV, USO)
+  // Fetch correlated indicators (SPY, QQQ, DJIA, GLD, SLV, USO) with today close-vs-open %
   useEffect(() => {
     const controller = new AbortController();
     const fetchCorrelatedIndicators = async () => {
       try {
         const headers: HeadersInit = {};
         if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
-
         const rows = await Promise.all(
           CORRELATED_INDICATOR_SYMBOLS.map(async ({ name, symbol: indexSymbol }) => {
             try {
-              const [quoteRes, returnsRes] = await Promise.all([
-                fetch(`${MARKET_API_BASE_URL}/market/quote/${indexSymbol}`, {
-                  headers,
-                  signal: controller.signal,
-                }),
-                fetch(`${MARKET_API_BASE_URL}/market/returns/${indexSymbol}?horizons=1`, {
-                  headers,
-                  signal: controller.signal,
-                }),
-              ]);
+              const quoteRes = await fetch(`${MARKET_API_BASE_URL}/market/quote/${indexSymbol}`, {
+                headers,
+                signal: controller.signal,
+              });
 
-              if (!quoteRes.ok || !returnsRes.ok) {
+              if (!quoteRes.ok) {
                 return { name, symbol: indexSymbol, price: null, change: null };
               }
 
               const quoteJson = (await quoteRes.json()) as MarketQuoteResponse;
-              const returnsJson = (await returnsRes.json()) as MarketReturnsResponse;
+              const open = toSafeNumber(quoteJson.data?.open);
+              const close = toSafeNumber(quoteJson.data?.close);
               return {
                 name,
                 symbol: indexSymbol,
-                price: toSafeNumber(quoteJson.data?.close),
-                change: toSafeNumber(returnsJson.data?.returns?.["1d"]),
+                price: close,
+                change: calculateDayOpenClosePercent(open, close),
               };
             } catch {
               return { name, symbol: indexSymbol, price: null, change: null };
@@ -378,6 +374,31 @@ const StockDetail = () => {
     };
 
     fetchCorrelatedIndicators();
+    return () => controller.abort();
+  }, [symbol]);
+
+  useEffect(() => {
+    if (!symbol) return;
+    const controller = new AbortController();
+    const loadNews = async () => {
+      setNewsLoading(true);
+      setNewsError(null);
+      try {
+        const items = await fetchMassiveNewsForTicker(symbol, {
+          signal: controller.signal,
+          limit: 10,
+        });
+        setNewsItems(items);
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        console.error("Error fetching news:", e);
+        setNewsError(e instanceof Error ? e.message : "Could not load news");
+        setNewsItems([]);
+      } finally {
+        setNewsLoading(false);
+      }
+    };
+    loadNews();
     return () => controller.abort();
   }, [symbol]);
 
@@ -405,11 +426,6 @@ const StockDetail = () => {
     strategyName: user ? "Growth & Value Mix" : "Default Strategy",
     portfolioGrowth: user ? "+12.4%" : null,
     correlatedIndices: correlatedIndicators,
-    news: [
-      { title: `${symbol || "AAPL"} Reports Strong Q4 Earnings`, source: "Reuters", time: "2h ago" },
-      { title: `Analysts Upgrade ${symbol || "AAPL"} Following Product Launch`, source: "Bloomberg", time: "5h ago" },
-      { title: `${symbol || "AAPL"} Expands AI Capabilities`, source: "CNBC", time: "1d ago" },
-    ],
     fundamentals: {
       marketCap: formatMarketCap(quoteMarketCap),
       open: quoteOpen,
@@ -857,9 +873,28 @@ const StockDetail = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {newsLoading && (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    <span className="text-sm">Loading news…</span>
+                  </div>
+                )}
+                {!newsLoading && newsError && (
+                  <p className="text-sm text-destructive py-2">{newsError}</p>
+                )}
+                {!newsLoading && !newsError && newsItems.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">No recent headlines for this symbol.</p>
+                )}
+                {!newsLoading && newsItems.length > 0 && (
                 <div className="space-y-3">
-                  {stockData.news.map((item, idx) => (
-                    <div key={idx} className="p-3 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer group">
+                  {newsItems.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-3 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer group"
+                    >
                       <h4 className="font-medium text-foreground text-sm leading-tight group-hover:text-primary transition-colors line-clamp-2">
                         {item.title}
                       </h4>
@@ -869,9 +904,10 @@ const StockDetail = () => {
                         <span className="text-xs text-muted-foreground">{item.time}</span>
                         <ExternalLink className="h-3 w-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
-                    </div>
+                    </a>
                   ))}
                 </div>
+                )}
               </CardContent>
             </Card>
 
@@ -891,7 +927,7 @@ const StockDetail = () => {
                         </p>
                       </div>
                       <span className={`text-sm font-semibold ${(index.change ?? 0) >= 0 ? "text-primary" : "text-destructive"}`}>
-                        {index.change === null ? "N/A" : `${index.change >= 0 ? "+" : ""}${index.change.toFixed(2)}%`}
+                        {index.change === null ? "N/A" : `${index.change >= 0 ? "+" : ""}${index.change.toFixed(2)}% today`}
                       </span>
                     </div>
                   ))}
