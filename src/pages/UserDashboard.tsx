@@ -50,6 +50,14 @@ interface DashboardIndex {
   positive: boolean;
 }
 
+interface TopPickRow {
+  symbol: string;
+  strategyName: string;
+  close: number | null;
+  return1d: number | null;
+  rank: number | null;
+}
+
 const MARKET_API_BASE_URL =
   import.meta.env.VITE_MARKET_API_BASE_URL ||
   "https://8p52xermu7.execute-api.ca-west-1.amazonaws.com/v1";
@@ -63,6 +71,17 @@ const DASHBOARD_INDEX_SPECS: Array<{ name: string; symbol: string; isCurrency?: 
   { name: "Gold", symbol: "GLD", isCurrency: true },
   { name: "Crude Oil", symbol: "USO", isCurrency: true },
 ];
+
+interface TodayPickItem {
+  symbol: string;
+  strategy_name: string | null;
+  rank: number | null;
+  price: string | number | null;
+}
+
+interface TodayPicksResponse {
+  data: TodayPickItem[];
+}
 
 const formatIndexValue = (value: number | null, isCurrency?: boolean) => {
   if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
@@ -81,6 +100,8 @@ const UserDashboard = () => {
   const [portfolioItems, setPortfolioItems] = useState<any[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
   const [journalStats, setJournalStats] = useState({ totalEntries: 0, weekStreak: 0, avgMood: "Neutral" });
+  const [topPicks, setTopPicks] = useState<TopPickRow[]>([]);
+  const [topPicksLoading, setTopPicksLoading] = useState(false);
   const [marketIndicators, setMarketIndicators] = useState<DashboardIndex[]>([
     { name: "S&P 500", symbol: "SPY", value: "N/A", change: "N/A", positive: true },
     { name: "NASDAQ", symbol: "QQQ", value: "N/A", change: "N/A", positive: true },
@@ -230,6 +251,81 @@ const UserDashboard = () => {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchDefaultVegasTopPicks = async () => {
+      setTopPicksLoading(true);
+      try {
+        const headers: HeadersInit = {};
+        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
+
+        const picksRes = await fetch(`${MARKET_API_BASE_URL}/picks/today?limit=100`, {
+          headers,
+          signal: controller.signal,
+        });
+        if (!picksRes.ok) throw new Error(`Top picks API failed (${picksRes.status})`);
+        const picksJson = (await picksRes.json()) as TodayPicksResponse;
+
+        const vegasRows = (picksJson.data || [])
+          .filter((item) => (item.strategy_name || "").toLowerCase().includes("vegas_channel"))
+          .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER))
+          .slice(0, 10);
+
+        const rows = await Promise.all(
+          vegasRows.map(async (pick) => {
+            const fallbackPrice = Number(pick.price);
+            try {
+              const returnsRes = await fetch(`${MARKET_API_BASE_URL}/market/returns/${pick.symbol}?horizons=1`, {
+                headers,
+                signal: controller.signal,
+              });
+
+              if (!returnsRes.ok) {
+                return {
+                  symbol: pick.symbol,
+                  strategyName: pick.strategy_name || "Vegas Channel",
+                  close: Number.isFinite(fallbackPrice) ? fallbackPrice : null,
+                  return1d: null,
+                  rank: pick.rank,
+                } satisfies TopPickRow;
+              }
+
+              const returnsJson = (await returnsRes.json()) as MarketReturnsResponse;
+              const return1d = Number(returnsJson.data?.returns?.["1d"]);
+
+              return {
+                symbol: pick.symbol,
+                strategyName: pick.strategy_name || "Vegas Channel",
+                close: Number.isFinite(fallbackPrice) ? fallbackPrice : null,
+                return1d: Number.isFinite(return1d) ? return1d : null,
+                rank: pick.rank,
+              } satisfies TopPickRow;
+            } catch {
+              return {
+                symbol: pick.symbol,
+                strategyName: pick.strategy_name || "Vegas Channel",
+                close: Number.isFinite(fallbackPrice) ? fallbackPrice : null,
+                return1d: null,
+                rank: pick.rank,
+              } satisfies TopPickRow;
+            }
+          })
+        );
+
+        setTopPicks(rows);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("Error fetching default Vegas Channel picks:", error);
+      } finally {
+        setTopPicksLoading(false);
+      }
+    };
+
+    fetchDefaultVegasTopPicks();
+    return () => controller.abort();
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim().toUpperCase();
@@ -335,6 +431,72 @@ const UserDashboard = () => {
                       </button>
                     ))}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-card border-border/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg font-display flex items-center gap-2">
+                      <Layers className="h-5 w-5 text-primary" />
+                      Today's Top 10 Picks
+                    </CardTitle>
+                    <CardDescription>
+                      Default strategy: Vegas Channel
+                    </CardDescription>
+                  </div>
+                  <Badge className="bg-primary/10 text-primary border-0">
+                    Vegas Channel
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {topPicksLoading
+                    ? Array.from({ length: 10 }).map((_, idx) => (
+                        <div key={`top-pick-skeleton-${idx}`} className="p-3 rounded-lg border border-border/50 bg-muted/20 animate-pulse">
+                          <div className="h-4 w-14 bg-muted rounded mb-2" />
+                          <div className="h-3 w-20 bg-muted rounded" />
+                        </div>
+                      ))
+                    : topPicks.map((pick) => (
+                        <button
+                          key={pick.symbol}
+                          type="button"
+                          onClick={() => navigate(`/stock/${pick.symbol}`)}
+                          className="text-left p-3 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-foreground">{pick.symbol}</span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              #{pick.rank ?? "-"}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {pick.close !== null ? `$${pick.close.toFixed(2)}` : "Price N/A"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground mt-1 truncate">
+                            {pick.strategyName}
+                          </div>
+                          <div className={`text-xs mt-1 flex items-center gap-1 ${pick.return1d !== null && pick.return1d >= 0 ? "text-primary" : "text-destructive"}`}>
+                            {pick.return1d !== null && pick.return1d >= 0 ? (
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                            ) : (
+                              <ArrowDownRight className="h-3.5 w-3.5" />
+                            )}
+                            {pick.return1d !== null
+                              ? `${pick.return1d >= 0 ? "+" : ""}${pick.return1d.toFixed(2)}%`
+                              : "Return N/A"}
+                          </div>
+                        </button>
+                      ))}
+                </div>
+                {!topPicksLoading && topPicks.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No Vegas Channel picks found for today.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
