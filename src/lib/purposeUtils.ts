@@ -1,7 +1,11 @@
+import type { User } from "@supabase/supabase-js";
+
 export interface UserPurpose {
   primaryGoal: string;
   purposeStatement: string;
   onboardingComplete: boolean;
+  /** Set on save so localStorage is not treated as another user’s onboarding on a shared device */
+  supabaseUserId?: string;
 }
 
 const PURPOSE_STORAGE_KEY = 'tradlyte_purpose';
@@ -29,6 +33,26 @@ export const saveUserPurpose = (purpose: UserPurpose): void => {
 export const isOnboardingComplete = (): boolean => {
   const purpose = getUserPurpose();
   return purpose?.onboardingComplete ?? false;
+};
+
+export const isOnboardingCompleteFromMetadata = (user: User | null | undefined): boolean => {
+  if (!user?.user_metadata) return false;
+  const v = user.user_metadata.onboarding_complete;
+  return v === true || v === "true";
+};
+
+const purposeMatchesUser = (user: User | null | undefined): boolean => {
+  if (!user) return false;
+  const purpose = getUserPurpose();
+  if (!purpose?.onboardingComplete) return false;
+  if (purpose.supabaseUserId) return purpose.supabaseUserId === user.id;
+  // Legacy entries had no supabaseUserId; treat as complete only for convenience on single-user browsers
+  return true;
+};
+
+/** Prefer Supabase user_metadata; scoped localStorage fallback for legacy or offline-ish UX. */
+export const isOnboardingCompleteForUser = (user: User | null | undefined): boolean => {
+  return isOnboardingCompleteFromMetadata(user) || purposeMatchesUser(user);
 };
 
 export const checkPurposeAlignment = (stock: { symbol: string; industry?: string }, purpose: UserPurpose | null): boolean => {

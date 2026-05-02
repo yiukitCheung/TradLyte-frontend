@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,7 @@ const TIME_HORIZON = [
 
 const PurposeOnboarding = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [selectedGoal, setSelectedGoal] = useState<string>('');
   const [customGoal, setCustomGoal] = useState('');
@@ -42,6 +45,7 @@ const PurposeOnboarding = () => {
   const [riskTolerance, setRiskTolerance] = useState<string>('');
   const [firstGoalTitle, setFirstGoalTitle] = useState('');
   const [firstGoalAmount, setFirstGoalAmount] = useState('');
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const handleGoalSelect = (goalId: string) => {
     setSelectedGoal(goalId);
@@ -84,9 +88,20 @@ const PurposeOnboarding = () => {
     }
   };
 
-  const handleComplete = () => {
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [authLoading, user, navigate]);
+
+  const handleComplete = async () => {
     if (!firstGoalTitle.trim()) {
       toast.error('Please enter a goal title');
+      return;
+    }
+    if (!user) {
+      toast.error('Please sign in to continue');
+      navigate('/auth');
       return;
     }
 
@@ -94,15 +109,43 @@ const PurposeOnboarding = () => {
       primaryGoal: selectedGoal === 'other' ? customGoal : PURPOSE_OPTIONS.find(o => o.id === selectedGoal)?.label || '',
       purposeStatement,
       onboardingComplete: true,
+      supabaseUserId: user.id,
     };
 
     saveUserPurpose(purpose);
-    toast.success('Welcome to TradLyte! Let\'s build wealth with purpose.');
-    navigate('/dashboard');
+
+    setIsFinishing(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { onboarding_complete: true },
+      });
+
+      if (error) {
+        toast.error(error.message || 'Could not save onboarding to your account. Please try again.');
+        return;
+      }
+
+      toast.success('Welcome to TradLyte! Let\'s build wealth with purpose.');
+      navigate('/dashboard');
+    } finally {
+      setIsFinishing(false);
+    }
   };
 
   const totalSteps = 6;
   const progress = (step / totalSteps) * 100;
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center text-muted-foreground">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -334,8 +377,8 @@ const PurposeOnboarding = () => {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={handleComplete} className="gap-2">
-                  Complete Setup
+                <Button onClick={handleComplete} disabled={isFinishing} className="gap-2">
+                  {isFinishing ? 'Saving…' : 'Complete Setup'}
                   <Sparkles className="h-4 w-4" />
                 </Button>
               )}

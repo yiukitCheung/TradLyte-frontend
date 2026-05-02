@@ -17,12 +17,13 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   TrendingUp, Target, BookOpen, Sparkles, BarChart3, 
   ArrowUpRight, ArrowDownRight, Zap, Calendar, Trophy, Brain, 
-  Search, Layers, ArrowRight, TrendingDown
+  Search, Layers, ArrowRight, TrendingDown, SlidersHorizontal
 } from "lucide-react";
-import { isOnboardingComplete, getUserPurpose } from '@/lib/purposeUtils';
+import { isOnboardingCompleteForUser } from '@/lib/purposeUtils';
 import { useCooldown } from '@/hooks/useCooldown';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -102,6 +103,12 @@ const UserDashboard = () => {
   const [journalStats, setJournalStats] = useState({ totalEntries: 0, weekStreak: 0, avgMood: "Neutral" });
   const [topPicks, setTopPicks] = useState<TopPickRow[]>([]);
   const [topPicksLoading, setTopPicksLoading] = useState(false);
+  const [pickIndustryInput, setPickIndustryInput] = useState("");
+  const [pickMinCapInput, setPickMinCapInput] = useState("");
+  const [pickMaxCapInput, setPickMaxCapInput] = useState("");
+  const [appliedPickIndustry, setAppliedPickIndustry] = useState("");
+  const [appliedPickMinCap, setAppliedPickMinCap] = useState("");
+  const [appliedPickMaxCap, setAppliedPickMaxCap] = useState("");
   const [marketIndicators, setMarketIndicators] = useState<DashboardIndex[]>([
     { name: "S&P 500", symbol: "SPY", value: "N/A", change: "N/A", positive: true },
     { name: "NASDAQ", symbol: "QQQ", value: "N/A", change: "N/A", positive: true },
@@ -115,7 +122,7 @@ const UserDashboard = () => {
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
-    } else if (!loading && user && !isOnboardingComplete()) {
+    } else if (!loading && user && !isOnboardingCompleteForUser(user)) {
       navigate('/onboarding');
     }
   }, [user, loading, navigate]);
@@ -251,6 +258,49 @@ const UserDashboard = () => {
     return () => controller.abort();
   }, []);
 
+  const buildPicksTodayUrl = () => {
+    const url = new URL(`${MARKET_API_BASE_URL}/picks/today`);
+    url.searchParams.set("limit", "200");
+    const ind = appliedPickIndustry.trim();
+    if (ind) url.searchParams.set("industry", ind);
+    const minRaw = appliedPickMinCap.trim();
+    const maxRaw = appliedPickMaxCap.trim();
+    if (minRaw) {
+      const n = parseInt(minRaw, 10);
+      if (Number.isFinite(n) && n >= 0) url.searchParams.set("min_market_cap", String(n));
+    }
+    if (maxRaw) {
+      const n = parseInt(maxRaw, 10);
+      if (Number.isFinite(n) && n >= 0) url.searchParams.set("max_market_cap", String(n));
+    }
+    return url.toString();
+  };
+
+  const applyTopPickFilters = () => {
+    const minRaw = pickMinCapInput.trim();
+    const maxRaw = pickMaxCapInput.trim();
+    if (minRaw && maxRaw) {
+      const minN = parseInt(minRaw, 10);
+      const maxN = parseInt(maxRaw, 10);
+      if (Number.isFinite(minN) && Number.isFinite(maxN) && minN > maxN) {
+        toast.error("Min market cap cannot be greater than max.");
+        return;
+      }
+    }
+    setAppliedPickIndustry(pickIndustryInput.trim());
+    setAppliedPickMinCap(minRaw);
+    setAppliedPickMaxCap(maxRaw);
+  };
+
+  const clearTopPickFilters = () => {
+    setPickIndustryInput("");
+    setPickMinCapInput("");
+    setPickMaxCapInput("");
+    setAppliedPickIndustry("");
+    setAppliedPickMinCap("");
+    setAppliedPickMaxCap("");
+  };
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -260,7 +310,7 @@ const UserDashboard = () => {
         const headers: HeadersInit = {};
         if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
 
-        const picksRes = await fetch(`${MARKET_API_BASE_URL}/picks/today?limit=100`, {
+        const picksRes = await fetch(buildPicksTodayUrl(), {
           headers,
           signal: controller.signal,
         });
@@ -324,7 +374,7 @@ const UserDashboard = () => {
 
     fetchDefaultVegasTopPicks();
     return () => controller.abort();
-  }, []);
+  }, [appliedPickIndustry, appliedPickMinCap, appliedPickMaxCap]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,12 +493,68 @@ const UserDashboard = () => {
                       Today's Top 10 Picks
                     </CardTitle>
                     <CardDescription>
-                      Default strategy: Vegas Channel
+                      Default strategy: Vegas Channel. Optional filters use the same API as the screener (exact industry, min/max market cap).
                     </CardDescription>
                   </div>
                   <Badge className="bg-primary/10 text-primary border-0">
                     Vegas Channel
                   </Badge>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Filter picks (API: <code className="text-[10px]">/picks/today</code>)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pick-industry" className="text-xs">
+                        Industry (exact)
+                      </Label>
+                      <Input
+                        id="pick-industry"
+                        placeholder="e.g. ELECTRONIC COMPUTERS"
+                        value={pickIndustryInput}
+                        onChange={(e) => setPickIndustryInput(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pick-min-cap" className="text-xs">
+                        Min mkt cap
+                      </Label>
+                      <Input
+                        id="pick-min-cap"
+                        type="number"
+                        min={0}
+                        placeholder="Any"
+                        value={pickMinCapInput}
+                        onChange={(e) => setPickMinCapInput(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pick-max-cap" className="text-xs">
+                        Max mkt cap
+                      </Label>
+                      <Input
+                        id="pick-max-cap"
+                        type="number"
+                        min={0}
+                        placeholder="Any"
+                        value={pickMaxCapInput}
+                        onChange={(e) => setPickMaxCapInput(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
+                      <Button type="button" size="sm" className="flex-1" onClick={applyTopPickFilters}>
+                        Apply
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" className="flex-1" onClick={clearTopPickFilters}>
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -494,7 +600,9 @@ const UserDashboard = () => {
                 </div>
                 {!topPicksLoading && topPicks.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No Vegas Channel picks found for today.
+                    No Vegas Channel picks match today{appliedPickIndustry || appliedPickMinCap || appliedPickMaxCap
+                      ? " for these filters (try different industry or market cap, or clear filters)"
+                      : "."}
                   </p>
                 )}
               </CardContent>

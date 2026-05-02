@@ -8,6 +8,7 @@ import { TrendingUp, ArrowLeft, Sparkles, Target, BookOpen, Shield } from 'lucid
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { isOnboardingCompleteForUser } from '@/lib/purposeUtils';
 
 const Auth = () => {
   const { signIn, signUp, user, loading } = useAuth();
@@ -16,19 +17,8 @@ const Auth = () => {
 
   useEffect(() => {
     if (!loading && user) {
-      // Check if onboarding is complete
-      const onboardingComplete = localStorage.getItem('tradlyte_purpose');
-      if (onboardingComplete) {
-        try {
-          const purpose = JSON.parse(onboardingComplete);
-          if (purpose.onboardingComplete) {
-            navigate('/dashboard');
-          } else {
-            navigate('/onboarding');
-          }
-        } catch {
-          navigate('/onboarding');
-        }
+      if (isOnboardingCompleteForUser(user)) {
+        navigate('/dashboard');
       } else {
         navigate('/onboarding');
       }

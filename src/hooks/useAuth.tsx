@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { isOnboardingCompleteForUser } from '@/lib/purposeUtils';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -46,15 +47,19 @@ export const useAuth = () => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    
-    if (!error) {
-      navigate('/dashboard');
+
+    if (!error && data.user) {
+      if (isOnboardingCompleteForUser(data.user)) {
+        navigate('/dashboard');
+      } else {
+        navigate('/onboarding');
+      }
     }
-    
+
     return { error };
   };
 

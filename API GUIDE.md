@@ -133,6 +133,11 @@ Routes must exist in API Gateway — keep **`deploy_http_api.sh`** `ROUTES` arra
 | Param | Type | Default | Notes |
 |-------|------|---------|--------|
 | `limit` | int | `25` | `1–200` |
+| `industry` | string | — | Exact match on `symbol_metadata.industry` (same as screener) |
+| `min_market_cap` | int | — | `>= 0`; filter `symbol_metadata.marketcap` |
+| `max_market_cap` | int | — | `>= 0`; filter `symbol_metadata.marketcap` |
+
+Picks are joined to `symbol_metadata` on `symbol`. Omitting filters returns the full ranked list for the latest `scan_date` (subject to `limit`). Rows without metadata still appear when **no** industry/cap filters are applied; with filters applied, symbols missing metadata usually drop out (unknown industry/cap).
 
 **`/picks/detail`**
 
