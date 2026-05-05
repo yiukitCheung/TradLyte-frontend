@@ -18,10 +18,31 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  TrendingUp, Target, BookOpen, Sparkles, BarChart3, 
-  ArrowUpRight, ArrowDownRight, Zap, Calendar, Trophy, Brain, 
-  Search, Layers, ArrowRight, TrendingDown, SlidersHorizontal
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import {
+  TrendingUp,
+  Target,
+  BookOpen,
+  Sparkles,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+  Zap,
+  Calendar,
+  Trophy,
+  Brain,
+  Search,
+  Layers,
+  ArrowRight,
+  TrendingDown,
+  RotateCcw,
 } from "lucide-react";
 import { isOnboardingCompleteForUser } from '@/lib/purposeUtils';
 import { useCooldown } from '@/hooks/useCooldown';
@@ -84,6 +105,39 @@ interface TodayPicksResponse {
   data: TodayPickItem[];
 }
 
+const ALL_SECTORS_SENTINEL = "__all_sectors__";
+
+/** UI labels → exact `symbol_metadata.industry` values for picks filter */
+const TOP_PICK_SECTOR_OPTIONS: { label: string; value: string }[] = [
+  { label: "All sectors", value: ALL_SECTORS_SENTINEL },
+  { label: "Technology", value: "ELECTRONIC COMPUTERS" },
+  { label: "Semiconductors", value: "SEMICONDUCTORS & RELATED DEVICES" },
+  { label: "Software", value: "SERVICES-PREPACKAGED SOFTWARE" },
+  { label: "Banks", value: "NATIONAL COMMERCIAL BANKS" },
+  { label: "Pharmaceuticals", value: "PHARMACEUTICAL PREPARATIONS" },
+  { label: "Biotech", value: "BIOLOGICAL PRODUCTS, (NO DIAGNOSTIC SUBSTANCES)" },
+  { label: "Oil & gas", value: "CRUDE PETROLEUM & NATURAL GAS" },
+  { label: "Retail", value: "RETAIL-VARIETY STORES" },
+];
+
+const MIN_MARKET_CAP_TIERS: { label: string; apiValue: string }[] = [
+  { label: "Any size", apiValue: "" },
+  { label: "$1B+", apiValue: "1000000000" },
+  { label: "$5B+", apiValue: "5000000000" },
+  { label: "$10B+", apiValue: "10000000000" },
+  { label: "$50B+", apiValue: "50000000000" },
+  { label: "$100B+", apiValue: "100000000000" },
+  { label: "$500B+", apiValue: "500000000000" },
+];
+
+function strategyLabelFromApi(strategyName: string | null): string {
+  if (!strategyName) return "Vegas Channel";
+  const s = strategyName.toLowerCase();
+  if (s.includes("vegas")) return "Vegas Channel";
+  if (s.includes("golden")) return "Golden Cross";
+  return strategyName.replace(/_/g, " ");
+}
+
 const formatIndexValue = (value: number | null, isCurrency?: boolean) => {
   if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
   return isCurrency ? `$${value.toFixed(2)}` : value.toFixed(2);
@@ -103,12 +157,9 @@ const UserDashboard = () => {
   const [journalStats, setJournalStats] = useState({ totalEntries: 0, weekStreak: 0, avgMood: "Neutral" });
   const [topPicks, setTopPicks] = useState<TopPickRow[]>([]);
   const [topPicksLoading, setTopPicksLoading] = useState(false);
-  const [pickIndustryInput, setPickIndustryInput] = useState("");
-  const [pickMinCapInput, setPickMinCapInput] = useState("");
-  const [pickMaxCapInput, setPickMaxCapInput] = useState("");
-  const [appliedPickIndustry, setAppliedPickIndustry] = useState("");
-  const [appliedPickMinCap, setAppliedPickMinCap] = useState("");
-  const [appliedPickMaxCap, setAppliedPickMaxCap] = useState("");
+  const [pickSectorValue, setPickSectorValue] = useState(ALL_SECTORS_SENTINEL);
+  const [pickMinCapTierIndex, setPickMinCapTierIndex] = useState(0);
+  const [pickQuery, setPickQuery] = useState({ sector: "", minCap: "" });
   const [marketIndicators, setMarketIndicators] = useState<DashboardIndex[]>([
     { name: "S&P 500", symbol: "SPY", value: "N/A", change: "N/A", positive: true },
     { name: "NASDAQ", symbol: "QQQ", value: "N/A", change: "N/A", positive: true },
@@ -258,48 +309,16 @@ const UserDashboard = () => {
     return () => controller.abort();
   }, []);
 
-  const buildPicksTodayUrl = () => {
-    const url = new URL(`${MARKET_API_BASE_URL}/picks/today`);
-    url.searchParams.set("limit", "200");
-    const ind = appliedPickIndustry.trim();
-    if (ind) url.searchParams.set("industry", ind);
-    const minRaw = appliedPickMinCap.trim();
-    const maxRaw = appliedPickMaxCap.trim();
-    if (minRaw) {
-      const n = parseInt(minRaw, 10);
-      if (Number.isFinite(n) && n >= 0) url.searchParams.set("min_market_cap", String(n));
-    }
-    if (maxRaw) {
-      const n = parseInt(maxRaw, 10);
-      if (Number.isFinite(n) && n >= 0) url.searchParams.set("max_market_cap", String(n));
-    }
-    return url.toString();
-  };
-
-  const applyTopPickFilters = () => {
-    const minRaw = pickMinCapInput.trim();
-    const maxRaw = pickMaxCapInput.trim();
-    if (minRaw && maxRaw) {
-      const minN = parseInt(minRaw, 10);
-      const maxN = parseInt(maxRaw, 10);
-      if (Number.isFinite(minN) && Number.isFinite(maxN) && minN > maxN) {
-        toast.error("Min market cap cannot be greater than max.");
-        return;
-      }
-    }
-    setAppliedPickIndustry(pickIndustryInput.trim());
-    setAppliedPickMinCap(minRaw);
-    setAppliedPickMaxCap(maxRaw);
-  };
-
-  const clearTopPickFilters = () => {
-    setPickIndustryInput("");
-    setPickMinCapInput("");
-    setPickMaxCapInput("");
-    setAppliedPickIndustry("");
-    setAppliedPickMinCap("");
-    setAppliedPickMaxCap("");
-  };
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const sectorRaw = pickSectorValue.trim();
+      setPickQuery({
+        sector: sectorRaw === ALL_SECTORS_SENTINEL ? "" : sectorRaw,
+        minCap: MIN_MARKET_CAP_TIERS[pickMinCapTierIndex]?.apiValue ?? "",
+      });
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [pickSectorValue, pickMinCapTierIndex]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -310,7 +329,12 @@ const UserDashboard = () => {
         const headers: HeadersInit = {};
         if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
 
-        const picksRes = await fetch(buildPicksTodayUrl(), {
+        const url = new URL(`${MARKET_API_BASE_URL}/picks/today`);
+        url.searchParams.set("limit", "200");
+        if (pickQuery.sector) url.searchParams.set("industry", pickQuery.sector);
+        if (pickQuery.minCap) url.searchParams.set("min_market_cap", pickQuery.minCap);
+
+        const picksRes = await fetch(url.toString(), {
           headers,
           signal: controller.signal,
         });
@@ -334,7 +358,7 @@ const UserDashboard = () => {
               if (!returnsRes.ok) {
                 return {
                   symbol: pick.symbol,
-                  strategyName: pick.strategy_name || "Vegas Channel",
+                  strategyName: strategyLabelFromApi(pick.strategy_name ?? null),
                   close: Number.isFinite(fallbackPrice) ? fallbackPrice : null,
                   return1d: null,
                   rank: pick.rank,
@@ -346,7 +370,7 @@ const UserDashboard = () => {
 
               return {
                 symbol: pick.symbol,
-                strategyName: pick.strategy_name || "Vegas Channel",
+                strategyName: strategyLabelFromApi(pick.strategy_name ?? null),
                 close: Number.isFinite(fallbackPrice) ? fallbackPrice : null,
                 return1d: Number.isFinite(return1d) ? return1d : null,
                 rank: pick.rank,
@@ -354,7 +378,7 @@ const UserDashboard = () => {
             } catch {
               return {
                 symbol: pick.symbol,
-                strategyName: pick.strategy_name || "Vegas Channel",
+                strategyName: strategyLabelFromApi(pick.strategy_name ?? null),
                 close: Number.isFinite(fallbackPrice) ? fallbackPrice : null,
                 return1d: null,
                 rank: pick.rank,
@@ -374,7 +398,7 @@ const UserDashboard = () => {
 
     fetchDefaultVegasTopPicks();
     return () => controller.abort();
-  }, [appliedPickIndustry, appliedPickMinCap, appliedPickMaxCap]);
+  }, [pickQuery]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -484,86 +508,78 @@ const UserDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="shadow-card border-border/50">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-lg font-display flex items-center gap-2">
-                      <Layers className="h-5 w-5 text-primary" />
-                      Today's Top 10 Picks
+            <Card className="shadow-card border-border/50 overflow-hidden">
+              <CardHeader className="pb-2 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base font-display flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-primary shrink-0" />
+                      Today&apos;s top picks
                     </CardTitle>
-                    <CardDescription>
-                      Default strategy: Vegas Channel. Optional filters use the same API as the screener (exact industry, min/max market cap).
+                    <CardDescription className="text-xs mt-0.5">
+                      Ranked ideas from{" "}
+                      <span className="text-foreground font-medium">Vegas Channel</span>. Tap a ticker for details.
                     </CardDescription>
                   </div>
-                  <Badge className="bg-primary/10 text-primary border-0">
-                    Vegas Channel
-                  </Badge>
+                  <Badge className="bg-primary/10 text-primary border-0 shrink-0 text-xs">Vegas Channel</Badge>
                 </div>
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                    Filter picks (API: <code className="text-[10px]">/picks/today</code>)
+                <div className="flex flex-col sm:flex-row sm:items-end gap-4 pt-1">
+                  <div className="space-y-1.5 sm:w-52 shrink-0">
+                    <Label className="text-[11px] text-muted-foreground">Sector</Label>
+                    <Select value={pickSectorValue} onValueChange={setPickSectorValue}>
+                      <SelectTrigger className="h-9 text-sm bg-background">
+                        <SelectValue placeholder="Sector" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TOP_PICK_SECTOR_OPTIONS.map((o) => (
+                          <SelectItem key={o.label} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="pick-industry" className="text-xs">
-                        Industry (exact)
-                      </Label>
-                      <Input
-                        id="pick-industry"
-                        placeholder="e.g. ELECTRONIC COMPUTERS"
-                        value={pickIndustryInput}
-                        onChange={(e) => setPickIndustryInput(e.target.value)}
-                        className="h-9 text-sm"
-                      />
+                  <div className="flex-1 space-y-1.5 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-[11px] text-muted-foreground">Minimum market cap</Label>
+                      <span className="text-[11px] font-medium text-foreground tabular-nums">
+                        {MIN_MARKET_CAP_TIERS[pickMinCapTierIndex]?.label ?? "Any size"}
+                      </span>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="pick-min-cap" className="text-xs">
-                        Min mkt cap
-                      </Label>
-                      <Input
-                        id="pick-min-cap"
-                        type="number"
-                        min={0}
-                        placeholder="Any"
-                        value={pickMinCapInput}
-                        onChange={(e) => setPickMinCapInput(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="pick-max-cap" className="text-xs">
-                        Max mkt cap
-                      </Label>
-                      <Input
-                        id="pick-max-cap"
-                        type="number"
-                        min={0}
-                        placeholder="Any"
-                        value={pickMaxCapInput}
-                        onChange={(e) => setPickMaxCapInput(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
-                      <Button type="button" size="sm" className="flex-1" onClick={applyTopPickFilters}>
-                        Apply
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" className="flex-1" onClick={clearTopPickFilters}>
-                        Clear
-                      </Button>
-                    </div>
+                    <Slider
+                      value={[pickMinCapTierIndex]}
+                      min={0}
+                      max={MIN_MARKET_CAP_TIERS.length - 1}
+                      step={1}
+                      onValueChange={(v) => setPickMinCapTierIndex(v[0] ?? 0)}
+                      className="py-1"
+                    />
                   </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 text-muted-foreground shrink-0"
+                    onClick={() => {
+                      setPickSectorValue(ALL_SECTORS_SENTINEL);
+                      setPickMinCapTierIndex(0);
+                    }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Reset
+                  </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-2">
                   {topPicksLoading
                     ? Array.from({ length: 10 }).map((_, idx) => (
-                        <div key={`top-pick-skeleton-${idx}`} className="p-3 rounded-lg border border-border/50 bg-muted/20 animate-pulse">
-                          <div className="h-4 w-14 bg-muted rounded mb-2" />
-                          <div className="h-3 w-20 bg-muted rounded" />
+                        <div
+                          key={`top-pick-skeleton-${idx}`}
+                          className="rounded-md border border-border/40 bg-muted/15 p-2.5 animate-pulse"
+                        >
+                          <div className="h-3.5 w-10 bg-muted rounded mb-2" />
+                          <div className="h-3 w-14 bg-muted rounded" />
                         </div>
                       ))
                     : topPicks.map((pick) => (
@@ -571,38 +587,33 @@ const UserDashboard = () => {
                           key={pick.symbol}
                           type="button"
                           onClick={() => navigate(`/stock/${pick.symbol}`)}
-                          className="text-left p-3 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                          className="rounded-md border border-border/50 bg-card/50 hover:border-primary/40 hover:bg-primary/5 transition-colors text-left p-2.5"
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-semibold text-foreground">{pick.symbol}</span>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                              #{pick.rank ?? "-"}
-                            </Badge>
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="font-semibold text-sm text-foreground tracking-tight">{pick.symbol}</span>
+                            <span className="text-[10px] text-muted-foreground tabular-nums">#{pick.rank ?? "—"}</span>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {pick.close !== null ? `$${pick.close.toFixed(2)}` : "Price N/A"}
+                          <div className="text-[11px] text-muted-foreground tabular-nums">
+                            {pick.close !== null ? `$${pick.close.toFixed(2)}` : "—"}
                           </div>
-                          <div className="text-[10px] text-muted-foreground mt-1 truncate">
-                            {pick.strategyName}
-                          </div>
-                          <div className={`text-xs mt-1 flex items-center gap-1 ${pick.return1d !== null && pick.return1d >= 0 ? "text-primary" : "text-destructive"}`}>
+                          <div
+                            className={`text-[11px] mt-0.5 flex items-center gap-0.5 tabular-nums ${
+                              pick.return1d !== null && pick.return1d >= 0 ? "text-primary" : "text-destructive"
+                            }`}
+                          >
                             {pick.return1d !== null && pick.return1d >= 0 ? (
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                            ) : (
-                              <ArrowDownRight className="h-3.5 w-3.5" />
-                            )}
-                            {pick.return1d !== null
-                              ? `${pick.return1d >= 0 ? "+" : ""}${pick.return1d.toFixed(2)}%`
-                              : "Return N/A"}
+                              <ArrowUpRight className="h-3 w-3 shrink-0" />
+                            ) : pick.return1d != null ? (
+                              <ArrowDownRight className="h-3 w-3 shrink-0" />
+                            ) : null}
+                            {pick.return1d !== null ? `${pick.return1d >= 0 ? "+" : ""}${pick.return1d.toFixed(2)}%` : "—"}
                           </div>
                         </button>
                       ))}
                 </div>
                 {!topPicksLoading && topPicks.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No Vegas Channel picks match today{appliedPickIndustry || appliedPickMinCap || appliedPickMaxCap
-                      ? " for these filters (try different industry or market cap, or clear filters)"
-                      : "."}
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Nothing matches Vegas Channel picks for these filters — try another sector or a lower minimum size.
                   </p>
                 )}
               </CardContent>
