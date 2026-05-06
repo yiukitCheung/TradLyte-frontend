@@ -22,29 +22,28 @@ const Hero = () => {
     <section className="relative py-24 md:py-32 lg:py-40 overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-subtle -z-10" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.15),transparent_60%)] -z-10" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(var(--accent)/0.1),transparent_60%)] -z-10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--foreground)/0.04),transparent_55%)] -z-10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(var(--accent)/0.12),transparent_52%)] -z-10" />
       
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto text-center space-y-10">
           
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium backdrop-blur-sm animate-fade-in">
-            <Sparkles className="h-4 w-4" />
-            <span>Purpose-Driven Investing</span>
+          <div className="inline-flex items-center px-5 py-2.5 rounded-pill bg-white border border-black/[0.07] shadow-nav animate-fade-in">
+            <span className="design-eyebrow design-eyebrow-dot leading-none">Purpose-driven investing</span>
           </div>
           
           {/* Main Headline */}
           <div className="space-y-6 animate-fade-in" style={{ animationDelay: "0.1s" }}>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-bold text-foreground leading-[1.1]">
-              Discover Stocks.{" "}
-              <span className="bg-gradient-primary bg-clip-text text-transparent">
-                Build Wealth
+            <h1 className="text-4xl sm:text-5xl md:text-[3rem] lg:text-[4rem] font-display font-medium text-foreground leading-[1] tracking-[-0.02em]">
+              Discover stocks.{" "}
+              <span className="font-medium text-link underline decoration-link/30 decoration-2 underline-offset-[0.15em]">
+                Build wealth
               </span>{" "}
-              with Purpose.
+              with purpose.
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-muted-foreground leading-[1.4] max-w-2xl mx-auto font-normal">
               Research any stock, design your investment strategy, and track your goals — all aligned with what matters most to you.
             </p>
           </div>
@@ -59,7 +58,7 @@ const Hero = () => {
                   placeholder="Search any stock symbol (e.g., AAPL, TSLA, NVDA)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-16 md:h-18 pl-14 pr-32 text-lg bg-card border-2 border-border hover:border-primary/50 focus:border-primary shadow-card rounded-2xl transition-all"
+                  className="h-16 md:h-[4.25rem] pl-14 pr-36 text-lg shadow-card rounded-pill bg-white border-black/[0.12] hover:border-foreground/[0.25] focus-visible:border-foreground/[0.45]"
                 />
                 <Button
                   type="submit"

@@ -13,9 +13,10 @@ export default {
       },
     },
     extend: {
+      /** DESIGN.md: Sofia Sans as MarkForMC substitute; single family for UI + headings */
       fontFamily: {
-        sans: ['Montserrat', 'system-ui', 'sans-serif'],
-        display: ['Lora', 'serif'],
+        sans: ['"Sofia Sans"', "system-ui", "Arial", "sans-serif"],
+        display: ['"Sofia Sans"', "system-ui", "Arial", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -27,6 +28,7 @@ export default {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
+        "primary-glow": "hsl(var(--primary-glow))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -42,6 +44,13 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+        },
+        "accent-glow": "hsl(var(--accent-glow))",
+        orbit: "hsl(var(--orbit))",
+        signal: "hsl(var(--signal))",
+        link: "hsl(var(--link))",
+        footer: {
+          DEFAULT: "hsl(var(--footer))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -64,8 +73,12 @@ export default {
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 4px)",
+        sm: "calc(var(--radius) - 10px)",
+        /** DESIGN §5: pills + stadium corners */
+        pill: "624.9375rem",
+        stadium: "2.5rem",
+        button: "1.25rem",
       },
       keyframes: {
         "accordion-down": {
@@ -78,20 +91,20 @@ export default {
         },
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(10px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" }
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
         "slide-up": {
           "0%": { opacity: "0", transform: "translateY(20px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" }
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
         "scale-in": {
           "0%": { opacity: "0", transform: "scale(0.95)" },
-          "100%": { opacity: "1", transform: "scale(1)" }
+          "100%": { opacity: "1", transform: "scale(1)" },
         },
-        "glow": {
+        glow: {
           "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.7" }
-        }
+          "50%": { opacity: "0.7" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.3s ease-out",
@@ -99,16 +112,18 @@ export default {
         "fade-in": "fade-in 0.5s ease-out",
         "slide-up": "slide-up 0.6s ease-out",
         "scale-in": "scale-in 0.4s ease-out",
-        "glow": "glow 3s ease-in-out infinite",
+        glow: "glow 3s ease-in-out infinite",
       },
       backgroundImage: {
-        'gradient-primary': 'var(--gradient-primary)',
-        'gradient-accent': 'var(--gradient-accent)',
-        'gradient-subtle': 'var(--gradient-subtle)',
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-accent": "var(--gradient-accent)",
+        "gradient-subtle": "var(--gradient-subtle)",
       },
       boxShadow: {
-        'elegant': 'var(--shadow-elegant)',
-        'card': 'var(--shadow-card)',
+        elegant: "var(--shadow-elegant)",
+        card: "var(--shadow-card)",
+        nav: "var(--shadow-nav)",
+        glow: "var(--shadow-glow)",
       },
     },
   },

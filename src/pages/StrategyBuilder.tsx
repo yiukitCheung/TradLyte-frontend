@@ -426,7 +426,7 @@ const StrategyBuilder = () => {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <Button size="lg" className="sm:flex-1 bg-gradient-primary hover:opacity-90 h-11" disabled={runBusy} onClick={handleSimulate}>
+        <Button size="lg" className="sm:flex-1 h-12" disabled={runBusy} onClick={handleSimulate}>
           <Play className="h-4 w-4 mr-2 shrink-0" />
           {runLabel}
         </Button>
@@ -541,7 +541,7 @@ const StrategyBuilder = () => {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <Button size="lg" className="sm:flex-1 bg-gradient-primary hover:opacity-90 h-11" disabled={runBusy} onClick={handleSimulate}>
+        <Button size="lg" className="sm:flex-1 h-12" disabled={runBusy} onClick={handleSimulate}>
           <Play className="h-4 w-4 mr-2 shrink-0" />
           {runLabel}
         </Button>
