@@ -221,6 +221,9 @@ Picks are joined to `symbol_metadata` on `symbol`. Omitting filters returns the 
 | Param | Type | Default | Notes |
 |-------|------|---------|--------|
 | `horizons` | string | `1,5,21` | Comma-separated trading days `1–252` |
+| `industry` | string | — | Exact match on `symbol_metadata.industry` |
+| `min_market_cap` | int | — | `>= 0`; filter `symbol_metadata.marketcap` |
+| `max_market_cap` | int | — | `>= 0`; filter `symbol_metadata.marketcap` |
 
 `{scan_date}` is a path segment, e.g. `2026-04-28`.
 

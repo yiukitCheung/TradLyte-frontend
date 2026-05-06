@@ -83,7 +83,19 @@ const StrategyBuilderPreview = ({ isAuthenticated }: StrategyBuilderPreviewProps
       </div>
 
       {/* Performance Chart - Hero Section */}
-      <PerformanceChart isSimulating={false} conditions={selectedConditions} />
+      <PerformanceChart
+        mode="custom"
+        prebuiltStrategySelected={false}
+        isBacktesting={false}
+        backtestSymbol=""
+        backtestResult={null}
+        backtestMeta={null}
+        strategySummary={{
+          title: "Sandbox layout",
+          description:
+            "This preview mirrors the Strategy Builder workspace. Sign in and open Strategy Builder for live `/backtest` runs.",
+        }}
+      />
 
       {/* Building Tools - Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

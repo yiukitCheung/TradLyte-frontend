@@ -1,19 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine } from "recharts";
-import { TrendingUp, AlertCircle, Layers, Loader2 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
+import { TrendingUp, Layers, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-/** Matches StrategyBuilder `Condition` shape without importing the page (avoids circular dependency). */
-export interface ChartStrategyCondition {
-  id: string;
-  type: string;
-  label: string;
-  category: "entry" | "exit";
-}
-
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 export interface StrategySummary {
   title: string;
   description: string;
@@ -24,23 +16,32 @@ export interface BacktestResultShape {
   sharpe_ratio?: number;
   max_drawdown_pct?: number;
   equity_curve?: number[];
+  /** Optional parallel timeline for each equity point (ISO or YYYY-MM-DD). */
+  equity_curve_dates?: string[];
   total_trades?: number;
   win_rate?: number;
+  final_capital?: number;
+  first_trade?: Record<string, unknown>;
+  last_trade?: Record<string, unknown>;
+  /** Full trade log from `trades` in the backtest response (same shape as API). */
+  trades?: Record<string, unknown>[];
 }
 
 interface PerformanceChartProps {
   mode: "prebuilt" | "custom";
   /** Prebuilt strategy card is selected */
   prebuiltStrategySelected: boolean;
-  /** Custom tab: legacy fake simulation pulse */
-  isSimulating: boolean;
   /** Prebuilt POST /backtest in flight */
   isBacktesting: boolean;
-  conditions: ChartStrategyCondition[];
   strategySummary?: StrategySummary | null;
   backtestSymbol: string;
   backtestResult: BacktestResultShape | null;
   backtestMeta?: Record<string, unknown> | null;
+  /** Optional benchmark curve aligned to equity points (e.g., SPY). */
+  benchmarkCurve?: number[] | null;
+  benchmarkLabel?: string;
+  prebuiltControls?: ReactNode;
+  customControls?: ReactNode;
 }
 
 function formatPctLike(v: number | undefined): string {
@@ -56,181 +57,193 @@ function formatWinRate(v: number | undefined): string {
   return `${v.toFixed(1)}%`;
 }
 
-const stockOptions = [
-  { value: "all", label: "All Stocks (General)", baseReturn: 8 },
-  { value: "aapl", label: "AAPL - Apple Inc.", baseReturn: 12 },
-  { value: "googl", label: "GOOGL - Alphabet", baseReturn: 10 },
-  { value: "msft", label: "MSFT - Microsoft", baseReturn: 11 },
-  { value: "tsla", label: "TSLA - Tesla", baseReturn: 15 },
-  { value: "amzn", label: "AMZN - Amazon", baseReturn: 9 },
-  { value: "nvda", label: "NVDA - NVIDIA", baseReturn: 18 },
-];
+/** Parse leading YYYY-MM-DD as UTC midnight for stable chart spacing. */
+function utcMsFromYmd(ymd: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd).trim());
+  if (!m) return null;
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isFinite(t) ? t : null;
+}
 
-const calculateStrategyMultiplier = (conditions: ChartStrategyCondition[]): number => {
-  if (conditions.length === 0) return 1;
+function parseEquityDate(s: string): number | null {
+  const asYmd = utcMsFromYmd(s);
+  if (asYmd != null) return asYmd;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : null;
+}
 
-  let multiplier = 1;
-  conditions.forEach((condition) => {
-    switch (condition.type) {
-      case "moving_average":
-        multiplier += 0.15;
-        break;
-      case "rsi":
-        multiplier += 0.18;
-        break;
-      case "volume":
-        multiplier += 0.12;
-        break;
-      case "macd":
-        multiplier += 0.2;
-        break;
-      case "bollinger":
-        multiplier += 0.22;
-        break;
-      case "fibonacci":
-        multiplier += 0.25;
-        break;
-      case "price_action":
-        multiplier += 0.1;
-        break;
-      case "momentum":
-        multiplier += 0.16;
-        break;
-      case "support_resistance":
-        multiplier += 0.14;
-        break;
-      default:
-        multiplier += 0.1;
+/** Inclusive span [start, end] mapped to n samples (evenly spaced in time). */
+function interpolateEquityTimestamps(n: number, startMs: number, endMs: number): number[] {
+  if (n <= 0) return [];
+  if (n === 1) return [startMs];
+  const span = Math.max(endMs - startMs, 0);
+  return Array.from({ length: n }, (_, i) => startMs + (span * i) / (n - 1));
+}
+
+function metaDateRangeMs(meta: Record<string, unknown> | null | undefined): { startMs: number; endMs: number } | null {
+  if (!meta) return null;
+  const s = meta.start_date ?? meta.startDate;
+  const e = meta.end_date ?? meta.endDate;
+  const startMs = typeof s === "string" ? utcMsFromYmd(s) : null;
+  const endMs = typeof e === "string" ? utcMsFromYmd(e) : null;
+  if (startMs == null || endMs == null) return null;
+  if (endMs < startMs) return null;
+  return { startMs, endMs };
+}
+
+const TRADE_COLUMN_ORDER = [
+  "entry_date",
+  "exit_date",
+  "entry_price",
+  "exit_price",
+  "pnl",
+  "pnl_pct",
+  "holding_days",
+  "exit_reason",
+] as const;
+
+function humanizeTradeKey(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Format a single cell for the trade log (handles fractional % vs dollars). */
+function formatTradeCell(key: string, val: unknown): string {
+  if (val === null || val === undefined) return "—";
+  if (typeof val === "boolean") return val ? "Yes" : "No";
+  if (typeof val === "number" && Number.isFinite(val)) {
+    const lk = key.toLowerCase();
+    if (lk.includes("pct") || lk.includes("percent") || lk.endsWith("_rate")) {
+      return formatPctLike(val);
     }
+    if (lk.includes("price") || lk === "pnl" || lk.includes("capital") || lk.includes("amount")) {
+      return val.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    }
+    return String(val);
+  }
+  if (typeof val === "string") {
+    const n = Number(val);
+    if (Number.isFinite(n) && val.trim() !== "") {
+      return formatTradeCell(key, n);
+    }
+    return val;
+  }
+  return String(val);
+}
+
+function collectTradeTableColumns(rows: Record<string, unknown>[]): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const fixed of TRADE_COLUMN_ORDER) {
+    const hit = rows.some((r) => fixed in r);
+    if (hit) {
+      ordered.push(fixed);
+      seen.add(fixed);
+    }
+  }
+  const rest = new Set<string>();
+  for (const row of rows) {
+    for (const k of Object.keys(row)) {
+      if (!seen.has(k)) rest.add(k);
+    }
+  }
+  [...rest].sort().forEach((k) => ordered.push(k));
+  return ordered;
+}
+
+function formatEquityAxisDate(ms: number, spanDays: number): string {
+  return new Date(ms).toLocaleDateString("en-US", {
+    month: "short",
+    ...(spanDays > 150 ? { year: "2-digit" } : { day: "numeric" }),
   });
-
-  if (conditions.length > 3) {
-    multiplier *= 0.9;
-  }
-
-  return Math.min(multiplier, 2.5);
-};
-
-const generateChartData = (stockBaseReturn: number, strategyMultiplier: number) => {
-  const data: Array<{ month: string; market: number; strategy: number; event?: string }> = [];
-  const events = [
-    { month: 6, label: "Fed Rate Hike", impact: -5 },
-    { month: 14, label: "Earnings Beat", impact: 8 },
-    { month: 22, label: "Market Correction", impact: -12 },
-    { month: 28, label: "Recovery Rally", impact: 10 },
-  ];
-
-  let marketValue = 100;
-  let strategyValue = 100;
-  const volatility = stockBaseReturn / 10;
-  const startDate = new Date(2022, 0);
-
-  for (let i = 0; i < 36; i++) {
-    const date = new Date(startDate);
-    date.setMonth(date.getMonth() + i);
-    const label = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-    const event = events.find((e) => e.month === i);
-    const randomFactor = (Math.random() - 0.48) * volatility;
-    const marketChange = event ? event.impact : randomFactor;
-    const strategyChange = event ? event.impact * (0.5 + strategyMultiplier * 0.2) : randomFactor * strategyMultiplier;
-
-    marketValue += marketChange;
-    strategyValue += strategyChange;
-
-    data.push({
-      month: label,
-      market: Math.round(marketValue * 10) / 10,
-      strategy: Math.round(strategyValue * 10) / 10,
-      event: event?.label,
-    });
-  }
-
-  return data;
-};
-
-const calculateSharpeRatio = (chartData: { market: number; strategy: number }[], riskFreePerAnnum = 0.02) => {
-  if (chartData.length < 2) return 0;
-  const monthlyRf = riskFreePerAnnum / 12;
-  const returns: number[] = [];
-  for (let i = 1; i < chartData.length; i++) {
-    const prev = chartData[i - 1].strategy;
-    const curr = chartData[i].strategy;
-    returns.push((curr - prev) / prev);
-  }
-  const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-  const variance = returns.reduce((s, r) => s + (r - avgReturn) ** 2, 0) / returns.length;
-  const vol = Math.sqrt(variance) || 0.001;
-  const excessReturn = avgReturn - monthlyRf;
-  const sharpeMonthly = vol ? excessReturn / vol : 0;
-  return Math.round(sharpeMonthly * Math.sqrt(12) * 100) / 100;
-};
+}
 
 const chartConfig = {
-  market: {
-    label: "Market Index",
-    color: "hsl(var(--muted-foreground))",
-  },
-  strategy: {
-    label: "Your Strategy",
-    color: "hsl(var(--primary))",
-  },
   equity: {
     label: "Backtest equity",
     color: "hsl(var(--primary))",
+  },
+  benchmark: {
+    label: "S&P 500 (SPY)",
+    color: "hsl(var(--muted-foreground))",
   },
 };
 
 const PerformanceChart = ({
   mode,
   prebuiltStrategySelected,
-  isSimulating,
   isBacktesting,
-  conditions,
   strategySummary,
   backtestSymbol,
   backtestResult,
   backtestMeta,
+  benchmarkCurve,
+  benchmarkLabel,
+  prebuiltControls,
+  customControls,
 }: PerformanceChartProps) => {
-  const [selectedStock, setSelectedStock] = useState("all");
-  const [chartKey, setChartKey] = useState(0);
-
-  const stock = stockOptions.find((s) => s.value === selectedStock) || stockOptions[0];
-  const strategyMultiplier = calculateStrategyMultiplier(conditions);
-
-  const chartData = useMemo(() => {
-    return generateChartData(stock.baseReturn, strategyMultiplier);
-  }, [stock.baseReturn, strategyMultiplier, chartKey]);
-
-  useEffect(() => {
-    if (conditions.length > 0) {
-      setChartKey((prev) => prev + 1);
-    }
-  }, [conditions.length]);
-
-  const finalMarket = chartData[chartData.length - 1]?.market ?? 0;
-  const finalStrategy = chartData[chartData.length - 1]?.strategy ?? 0;
-  const outperformance =
-    finalMarket !== 0 ? (((finalStrategy - finalMarket) / finalMarket) * 100).toFixed(1) : "0";
-  const sharpeRatio = useMemo(() => calculateSharpeRatio(chartData), [chartData]);
-
-  const hasCustomConditions = conditions.length > 0;
-
   const realChartData = useMemo(() => {
     const curve = backtestResult?.equity_curve;
     if (!curve?.length) return [];
-    return curve.map((v, i) => ({
-      bar: String(i + 1),
-      equity: typeof v === "number" && Number.isFinite(v) ? v : Number(v),
-    }));
-  }, [backtestResult]);
+    const n = curve.length;
+    const explicit = backtestResult.equity_curve_dates;
+    let timestamps: number[] | null = null;
+    if (Array.isArray(explicit) && explicit.length === n) {
+      const parsed = explicit.map((d) => (typeof d === "string" ? parseEquityDate(d) : null));
+      if (parsed.every((t): t is number => t != null)) timestamps = parsed;
+    }
+    if (timestamps == null) {
+      const range = metaDateRangeMs(backtestMeta);
+      if (range) timestamps = interpolateEquityTimestamps(n, range.startMs, range.endMs);
+    }
+    const spanDays =
+      timestamps && timestamps.length >= 2
+        ? Math.max(1, (timestamps[timestamps.length - 1]! - timestamps[0]!) / 86400000)
+        : 0;
+    return curve.map((v, i) => {
+      const equity = typeof v === "number" && Number.isFinite(v) ? v : Number(v);
+      const ts = timestamps?.[i];
+      const dateLabel =
+        ts != null ? formatEquityAxisDate(ts, spanDays) : String(i + 1);
+      const bmk =
+        Array.isArray(benchmarkCurve) && benchmarkCurve.length === n
+          ? benchmarkCurve[i]
+          : undefined;
+      return { dateLabel, dateMs: ts ?? i, equity, benchmark: bmk };
+    });
+  }, [backtestResult, backtestMeta, benchmarkCurve]);
 
-  const hasRealBacktest = mode === "prebuilt" && realChartData.length > 0;
+  const hasLiveBacktestMetrics =
+    !!backtestResult &&
+    (backtestResult.total_return_pct != null ||
+      backtestResult.final_capital != null ||
+      backtestResult.total_trades != null ||
+      backtestResult.sharpe_ratio != null);
+
+  const hasEquityCurve = realChartData.length > 0;
+
+  const tradeLogRows = backtestResult?.trades;
+  const tradeTableColumns = useMemo(() => {
+    if (!tradeLogRows?.length) return [];
+    return collectTradeTableColumns(tradeLogRows);
+  }, [tradeLogRows]);
 
   const prebuiltEmptyMessage = !prebuiltStrategySelected
     ? "Select a prebuilt strategy above, enter a symbol and date range, then run simulation."
     : !backtestSymbol.trim()
       ? "Enter a stock symbol to backtest."
-      : "Click Run simulation to load results from the serving API.";
+      : "Click Run to load results below.";
+
+  const customEmptyMessage = !backtestSymbol.trim()
+    ? "Enter a symbol and dates in the workspace above."
+    : "Configure setup, trigger, and exit, then run — results appear here.";
+
+  const showPrebuiltPlaceholder =
+    mode === "prebuilt" && (!prebuiltStrategySelected || (!hasLiveBacktestMetrics && !isBacktesting));
+
+  const showCustomPlaceholder =
+    mode === "custom" && (!hasLiveBacktestMetrics && !isBacktesting);
 
   return (
     <Card className="shadow-card border-2 border-primary/20 bg-gradient-to-br from-background to-primary/5">
@@ -243,9 +256,8 @@ const PerformanceChart = ({
             <div>
               <CardTitle className="text-2xl lg:text-3xl font-display">Performance analysis</CardTitle>
               <CardDescription className="text-base">
-                {mode === "prebuilt"
-                  ? "Numbers from your latest run above — equity curve plus risk and trade stats."
-                  : "Rough preview from your chosen rules — for layout only, not a live backtest."}
+                Live `/backtest` results for this tab — equity curve, SPY comparison when available, and trade stats from
+                the API.
               </CardDescription>
             </div>
           </div>
@@ -274,98 +286,110 @@ const PerformanceChart = ({
           )}
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-            {mode === "custom" ? (
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Benchmark style:</label>
-                <Select value={selectedStock} onValueChange={setSelectedStock}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select a stock" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stockOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <span className="text-xs font-medium text-muted-foreground">Backtest symbol</span>
-                <Badge variant="secondary" className="font-mono text-sm px-3 py-1">
-                  {backtestSymbol.trim() || "—"}
-                </Badge>
-              </div>
-            )}
-
-            {mode === "custom" &&
-              hasCustomConditions &&
-              (parseFloat(outperformance) > 0 ? (
-                <Badge className="bg-gradient-primary text-lg px-4 py-2 shadow-glow">
-                  <TrendingUp className="h-4 w-4 mr-2" />+{outperformance}% vs Market
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="border-destructive text-destructive text-lg px-4 py-2">
-                  <TrendingUp className="h-4 w-4 mr-2 rotate-180" />
-                  {outperformance}% vs Market
-                </Badge>
-              ))}
+              <span className="text-xs font-medium text-muted-foreground">Backtest symbol</span>
+              <Badge variant="secondary" className="font-mono text-sm px-3 py-1">
+                {backtestSymbol.trim() || "—"}
+              </Badge>
+            </div>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {mode === "prebuilt" ? (
-          <>
-            {!prebuiltStrategySelected || !hasRealBacktest ? (
-              <div className="relative min-h-[350px] flex items-center justify-center bg-muted/30 rounded-xl border-2 border-dashed border-primary/30">
-                {isBacktesting && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/70 backdrop-blur-sm">
-                    <div className="flex items-center gap-2 text-primary font-medium">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                      Running backtest…
-                    </div>
+        {mode === "prebuilt" && prebuiltControls && <div className="mb-5">{prebuiltControls}</div>}
+        {mode === "custom" && customControls && <div className="mb-5">{customControls}</div>}
+
+        {isBacktesting && (
+          <div className="flex items-center gap-2 text-sm text-primary mb-4">
+            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+            Running backtest…
+          </div>
+        )}
+
+        {showPrebuiltPlaceholder ? (
+          <div className="relative min-h-[280px] flex items-center justify-center bg-muted/30 rounded-xl border-2 border-dashed border-primary/30">
+            <div className="text-center p-8 max-w-lg">
+              <div className="w-16 h-16 rounded-full bg-gradient-primary/20 flex items-center justify-center mx-auto mb-4">
+                <TrendingUp className="h-8 w-8 text-primary" />
+              </div>
+              <p className="text-lg font-semibold text-foreground">{prebuiltEmptyMessage}</p>
+              {prebuiltStrategySelected && backtestSymbol.trim() && (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Configure above, then run once — results appear here.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : showCustomPlaceholder ? (
+          <div className="relative min-h-[280px] flex items-center justify-center bg-muted/30 rounded-xl border-2 border-dashed border-primary/30">
+            <div className="text-center p-8 max-w-lg">
+              <div className="w-16 h-16 rounded-full bg-gradient-primary/20 flex items-center justify-center mx-auto mb-4">
+                <TrendingUp className="h-8 w-8 text-primary" />
+              </div>
+              <p className="text-lg font-semibold text-foreground">{customEmptyMessage}</p>
+              <p className="text-muted-foreground mt-2 text-sm max-w-md mx-auto">
+                Change one layer at a time (setup / trigger / exit) between runs so experiments stay comparable — and rename{" "}
+                <span className="font-mono">strategy_name</span> often so payloads stay identifiable.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {hasLiveBacktestMetrics && (
+              <>
+                {hasEquityCurve ? (
+                  <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={realChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis
+                          dataKey="dateLabel"
+                          stroke="hsl(var(--muted-foreground))"
+                          fontSize={11}
+                          tickLine={false}
+                          interval="preserveStartEnd"
+                          minTickGap={28}
+                          angle={-25}
+                          textAnchor="end"
+                          height={52}
+                        />
+                        <YAxis
+                          stroke="hsl(var(--muted-foreground))"
+                          fontSize={12}
+                          tickLine={false}
+                          tickFormatter={(v) => `$${typeof v === "number" ? v.toLocaleString() : v}`}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line
+                          type="monotone"
+                          dataKey="equity"
+                          name="Equity"
+                          stroke={chartConfig.equity.color}
+                          strokeWidth={3}
+                          dot={false}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="benchmark"
+                          name={benchmarkLabel ?? chartConfig.benchmark.label}
+                          stroke={chartConfig.benchmark.color}
+                          strokeWidth={2}
+                          strokeDasharray="6 4"
+                          dot={false}
+                          connectNulls
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                ) : (
+                  <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground mb-6">
+                    No equity series in this response — showing summary metrics only.
                   </div>
                 )}
-                <div className="text-center p-8 max-w-lg">
-                  <div className="w-20 h-20 rounded-full bg-gradient-primary/20 flex items-center justify-center mx-auto mb-4">
-                    <TrendingUp className="h-10 w-10 text-primary" />
-                  </div>
-                  <p className="text-xl font-semibold text-foreground">{prebuiltEmptyMessage}</p>
-                  {prebuiltStrategySelected && backtestSymbol.trim() && (
-                    <p className="text-muted-foreground mt-2 text-sm">
-                      Serving API equity curve and risk metrics render here after each run.
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <>
-                <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={realChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="bar" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} />
-                      <YAxis
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickLine={false}
-                        tickFormatter={(v) => `$${typeof v === "number" ? v.toLocaleString() : v}`}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line
-                        type="monotone"
-                        dataKey="equity"
-                        name="Equity"
-                        stroke={chartConfig.equity.color}
-                        strokeWidth={3}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
 
-                <div className="mt-6 grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div
+                  className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 ${hasEquityCurve ? "mt-6" : ""}`}
+                >
                   <div className="p-4 rounded-xl bg-muted/50 border border-border">
                     <p className="text-xs text-muted-foreground">Total return</p>
                     <p className="text-2xl font-bold text-foreground">{formatPctLike(backtestResult?.total_return_pct)}</p>
@@ -390,7 +414,71 @@ const PerformanceChart = ({
                     <p className="text-xs text-muted-foreground">Win rate</p>
                     <p className="text-2xl font-bold text-foreground">{formatWinRate(backtestResult?.win_rate)}</p>
                   </div>
+                  <div className="p-4 rounded-xl bg-muted/50 border border-border">
+                    <p className="text-xs text-muted-foreground">Ending capital</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {backtestResult?.final_capital != null
+                        ? `$${backtestResult.final_capital.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : "—"}
+                    </p>
+                  </div>
                 </div>
+
+                {tradeLogRows && tradeLogRows.length > 0 && tradeTableColumns.length > 0 && (
+                  <div className="mt-6 space-y-2">
+                    <p className="text-sm font-medium text-foreground">Trade log</p>
+                    <div className="rounded-xl border border-border/60 overflow-hidden">
+                      <div className="max-h-[min(28rem,55vh)] overflow-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 z-10 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/80">
+                            <TableRow>
+                              <TableHead className="w-10 text-muted-foreground">#</TableHead>
+                              {tradeTableColumns.map((col) => (
+                                <TableHead key={col} className="whitespace-nowrap text-muted-foreground">
+                                  {humanizeTradeKey(col)}
+                                </TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {tradeLogRows.map((row, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="text-muted-foreground tabular-nums">{idx + 1}</TableCell>
+                                {tradeTableColumns.map((col) => (
+                                  <TableCell key={col} className="whitespace-nowrap font-mono text-xs">
+                                    {formatTradeCell(col, row[col])}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(!tradeLogRows || tradeLogRows.length === 0) &&
+                  (backtestResult?.first_trade || backtestResult?.last_trade) && (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {backtestResult.first_trade && (
+                        <div className="rounded-lg border border-border/60 bg-card/50 p-3 text-xs">
+                          <p className="font-medium text-foreground mb-1">First trade</p>
+                          <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap font-mono overflow-x-auto">
+                            {JSON.stringify(backtestResult.first_trade, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                      {backtestResult.last_trade && (
+                        <div className="rounded-lg border border-border/60 bg-card/50 p-3 text-xs">
+                          <p className="font-medium text-foreground mb-1">Last trade</p>
+                          <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap font-mono overflow-x-auto">
+                            {JSON.stringify(backtestResult.last_trade, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 {backtestMeta && (
                   <p className="mt-4 text-xs text-muted-foreground">
@@ -400,105 +488,6 @@ const PerformanceChart = ({
                 )}
               </>
             )}
-          </>
-        ) : !hasCustomConditions ? (
-          <div className="h-[350px] flex items-center justify-center bg-muted/30 rounded-xl border-2 border-dashed border-primary/30">
-            <div className="text-center p-8">
-              <div className="w-20 h-20 rounded-full bg-gradient-primary/20 flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="h-10 w-10 text-primary" />
-              </div>
-              <p className="text-xl font-semibold text-foreground">Add conditions to see illustrative performance</p>
-              <p className="text-muted-foreground mt-2 max-w-md">
-                Prebuilt strategies use the live API; custom mode stays a sandbox projection for layout experiments.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <>
-            <ChartContainer config={chartConfig} className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  {chartData.map((point, index) =>
-                    point.event ? (
-                      <ReferenceLine
-                        key={index}
-                        x={point.month}
-                        stroke="hsl(var(--accent))"
-                        strokeDasharray="3 3"
-                        label={{
-                          value: point.event,
-                          position: "top",
-                          fill: "hsl(var(--accent))",
-                          fontSize: 10,
-                        }}
-                      />
-                    ) : null
-                  )}
-                  <Line
-                    type="monotone"
-                    dataKey="market"
-                    stroke={chartConfig.market.color}
-                    strokeWidth={2}
-                    dot={false}
-                    opacity={0.6}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="strategy"
-                    stroke={chartConfig.strategy.color}
-                    strokeWidth={4}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-
-            <div className="mt-6 grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                <p className="text-xs text-muted-foreground">Market Final Value</p>
-                <p className="text-2xl font-bold text-foreground">${finalMarket}</p>
-              </div>
-              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-                <p className="text-xs text-muted-foreground">Strategy Final Value</p>
-                <p className="text-2xl font-bold text-primary">${finalStrategy}</p>
-              </div>
-              <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                <p className="text-xs text-muted-foreground">Sharpe Ratio</p>
-                <p className="text-2xl font-bold text-foreground">{sharpeRatio}</p>
-              </div>
-              <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                <p className="text-xs text-muted-foreground">Active Conditions</p>
-                <p className="text-2xl font-bold text-foreground">{conditions.length}</p>
-              </div>
-              <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                <p className="text-xs text-muted-foreground">Strategy Multiplier</p>
-                <p className="text-2xl font-bold text-foreground">{strategyMultiplier.toFixed(2)}x</p>
-              </div>
-            </div>
-          </>
-        )}
-
-        {mode === "custom" && hasCustomConditions && (
-          <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Market Events:</span> Illustrative only — not from your
-                serving API.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isSimulating && mode === "custom" && (
-          <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20 animate-pulse">
-            <p className="text-sm text-primary font-medium text-center">Updating illustrative projection…</p>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
