@@ -77,18 +77,27 @@ export type Database = {
           full_name: string | null
           id: string
           updated_at: string | null
+          email?: string | null
+          reward_level: number
+          reward_points: number
         }
         Insert: {
           created_at?: string | null
           full_name?: string | null
           id: string
           updated_at?: string | null
+          email?: string | null
+          reward_level?: number
+          reward_points?: number
         }
         Update: {
           created_at?: string | null
           full_name?: string | null
           id?: string
           updated_at?: string | null
+          email?: string | null
+          reward_level?: number
+          reward_points?: number
         }
         Relationships: []
       }

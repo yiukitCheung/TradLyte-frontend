@@ -33,6 +33,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { type Milestone } from '@/lib/goalUtils';
+import { POINTS_PER_NEW_GOAL } from "@/lib/rewards";
+import { cn } from "@/lib/utils";
 
 /** Stored in DB: no "completed" (computed from current_amount when displaying) */
 interface StoredMilestone {
@@ -68,6 +70,9 @@ const Goals = () => {
   const [newMilestones, setNewMilestones] = useState<{ id: string; title: string; financialTarget: string; description: string }[]>([]);
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [rewardProfile, setRewardProfile] = useState<{ points: number; level: number } | null>(
+    null
+  );
 
   useEffect(() => {
     // Wait for auth to finish loading before checking
@@ -83,24 +88,48 @@ const Goals = () => {
     fetchGoals();
   }, [user, authLoading, navigate]);
 
-  const fetchGoals = async () => {
+  const GOAL_COLUMNS =
+    'id,user_id,title,description,target_amount,current_amount,target_date,status,milestones,created_at,updated_at' as const;
+
+  const fetchGoals = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     if (!user) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     try {
-      const { data, error } = await supabase
-        .from('user_goals')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      const [goalsResult, profileResult] = await Promise.all([
+        supabase
+          .from('user_goals')
+          .select(GOAL_COLUMNS)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('reward_points, reward_level')
+          .eq('id', user.id)
+          .maybeSingle(),
+      ]);
 
+      const error = goalsResult.error;
       if (error) {
         console.error('Supabase error:', error);
         throw error;
       }
 
+      if (profileResult.error) {
+        console.warn("Goals: could not load reward profile", profileResult.error.message);
+      } else if (profileResult.data) {
+        setRewardProfile({
+          points: Number(profileResult.data.reward_points ?? 0),
+          level: Number(profileResult.data.reward_level ?? 1),
+        });
+      }
+
+      const data = goalsResult.data;
       const goalsWithMilestones = (data || []).map(goal => {
         try {
           const targetAmount = goal.target_amount ? parseFloat(goal.target_amount.toString()) : 0;
@@ -143,7 +172,7 @@ const Goals = () => {
       toast.error(error.message || 'Failed to load goals. Please refresh the page.');
       setGoals([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -184,14 +213,14 @@ const Goals = () => {
 
       if (error) throw error;
 
-      toast.success('Goal created successfully!');
+      toast.success(`Goal created! +${POINTS_PER_NEW_GOAL} Tradlyte reward points earned.`);
       setAddDialogOpen(false);
       setNewGoalTitle('');
       setNewGoalDescription('');
       setNewGoalAmount('');
       setNewGoalDate('');
       setNewMilestones([]);
-      fetchGoals();
+      fetchGoals({ silent: true });
     } catch (error: any) {
       console.error('Error adding goal:', error);
       toast.error(error.message || 'Failed to create goal');
@@ -210,7 +239,7 @@ const Goals = () => {
       if (error) throw error;
       toast.success('Goal deleted');
       setGoalToDelete(null);
-      fetchGoals();
+      fetchGoals({ silent: true });
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete goal');
     } finally {
@@ -218,8 +247,9 @@ const Goals = () => {
     }
   };
 
-  // Show loading while auth is loading or goals are loading
-  if (authLoading || loading) {
+  // Blocking spinner only until auth settles and the first goals fetch completes
+  const showGoalsSkeleton = loading && goals.length === 0;
+  if (authLoading) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -234,27 +264,66 @@ const Goals = () => {
     );
   }
 
-  // If no user after loading, this will be handled by the useEffect redirect
   if (!user) {
     return null;
   }
 
+  if (showGoalsSkeleton) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background relative isolate">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          <div className="absolute top-[-6rem] left-[-4rem] h-72 w-72 rounded-full bg-primary/[0.06] blur-3xl" />
+        </div>
+        <Header />
+        <main className="relative z-10 flex-1 py-8">
+          <div className="container mx-auto px-4 space-y-6 max-w-6xl">
+            <div className="h-14 w-72 rounded-stadium bg-muted/50 animate-pulse" />
+            <div className="h-52 rounded-stadium border border-border/40 bg-muted/25 animate-pulse shadow-card" />
+            <div className="h-52 rounded-stadium border border-border/40 bg-muted/25 animate-pulse shadow-card" />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background relative isolate">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -top-20 right-[-5%] h-[340px] w-[340px] rounded-full bg-primary/[0.06] blur-3xl" />
+        <div className="absolute top-[46%] left-[-12%] h-[280px] w-[280px] rounded-full bg-accent/[0.05] blur-3xl" />
+      </div>
       <Header />
-      <main className="flex-1 py-8">
+      <main className="relative z-10 flex-1 py-8">
         <div className="container mx-auto px-4 space-y-8 flex-1 flex flex-col">
           <div className="max-w-6xl mx-auto w-full">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <Target className="h-8 w-8 text-primary" />
-                <div>
-                  <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">
-                    Life Goals Journey
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-8">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-accent/10 text-primary shadow-sm ring-1 ring-primary/10">
+                  <Target className="h-7 w-7" strokeWidth={1.75} />
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">Life planning</p>
+                  <h1 className="text-3xl md:text-4xl font-display font-semibold tracking-tight text-foreground">
+                    Your goals
                   </h1>
-                  <p className="text-muted-foreground">
-                    Let Tradlyte guide you to discover and achieve your dreams through smart financial planning
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
+                    Set targets, milestones, and track progress alongside Tradlyte rewards.
                   </p>
+                  {rewardProfile != null ? (
+                    <div className="inline-flex flex-wrap items-center gap-2 pt-2">
+                      <span className="inline-flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/[0.05] px-3 py-1.5 text-xs font-medium">
+                        <span className="text-muted-foreground">Level</span>
+                        <span className="tabular-nums text-foreground">{rewardProfile.level}</span>
+                        <span className="mx-1 h-3 w-px bg-border shrink-0" aria-hidden />
+                        <span className="tabular-nums text-primary">{rewardProfile.points}</span>
+                        <span className="text-muted-foreground">pts</span>
+                      </span>
+                      <Badge variant="outline" className="rounded-lg border-accent/25 text-accent-foreground/90 bg-accent/[0.06] font-normal">
+                        New goal +{POINTS_PER_NEW_GOAL}
+                      </Badge>
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <Dialog open={addDialogOpen} onOpenChange={(open) => {
@@ -268,12 +337,13 @@ const Goals = () => {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button 
-                    className="shadow-elegant"
+                  <Button
+                    size="lg"
+                    className="rounded-xl px-6 h-11 shadow-elegant gap-2 font-semibold shrink-0"
                     onClick={() => setAddDialogOpen(true)}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add New Goal
+                    <Plus className="h-4 w-4" strokeWidth={2} />
+                    New goal
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
@@ -412,22 +482,26 @@ const Goals = () => {
 
           {goals.length === 0 ? (
             <div className="flex-1 flex items-center justify-center min-h-[320px]">
-              <Card className="shadow-elegant max-w-2xl mx-auto w-full">
-                <CardContent className="py-16 text-center">
-                  <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-foreground mb-2">No Goals Yet</h3>
-                  <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                    Start your journey by creating your first financial goal and adding your own milestones.
+              <Card className="max-w-xl mx-auto w-full rounded-stadium border-border/40 shadow-elegant overflow-hidden ring-1 ring-black/[0.03]">
+                <div className="h-1 bg-gradient-to-r from-primary/60 via-accent/50 to-primary/40" />
+                <CardContent className="py-14 sm:py-16 text-center px-6">
+                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/12 to-accent/10 text-primary ring-1 ring-primary/10">
+                    <Target className="h-8 w-8" strokeWidth={1.75} />
+                  </div>
+                  <h3 className="text-xl font-display font-semibold text-foreground mb-2">Start with one goal</h3>
+                  <p className="text-sm text-muted-foreground mb-8 max-w-sm mx-auto leading-relaxed">
+                    Name it, set a target, and add milestones so progress feels tangible.
                   </p>
-                  <Button 
+                  <Button
+                    size="lg"
+                    className="rounded-xl shadow-elegant px-8 h-11 font-semibold"
                     onClick={(e) => {
                       e.preventDefault();
                       setAddDialogOpen(true);
-                    }} 
-                    className="shadow-elegant"
+                    }}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Goal
+                    <Plus className="h-4 w-4 mr-2" strokeWidth={2} />
+                    Create first goal
                   </Button>
                 </CardContent>
               </Card>
@@ -435,37 +509,55 @@ const Goals = () => {
           ) : (
             <div className="max-w-6xl mx-auto space-y-6">
               {goals.map((goal) => (
-                <Card key={goal.id} className="shadow-elegant">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-xl font-display mb-2">{goal.title}</CardTitle>
-                        {goal.description && (
-                          <CardDescription className="text-base">{goal.description}</CardDescription>
-                        )}
-                        <div className="flex items-center gap-4 mt-3 text-sm">
-                          <span className="text-muted-foreground">
-                            Target: <span className="font-semibold text-foreground">${goal.target_amount ? parseFloat(goal.target_amount.toString()).toLocaleString() : '0'}</span>
-                          </span>
-                          <span className="text-muted-foreground">
-                            Current: <span className="font-semibold text-foreground">${goal.current_amount ? parseFloat(goal.current_amount.toString()).toLocaleString() : '0'}</span>
-                          </span>
-                          {goal.target_date && (
-                            <span className="text-muted-foreground">
-                              By: <span className="font-semibold text-foreground">{new Date(goal.target_date).toLocaleDateString()}</span>
+                <Card
+                  key={goal.id}
+                  className="rounded-stadium border-border/40 shadow-card hover:shadow-elegant transition-shadow duration-300 overflow-hidden bg-card/90 backdrop-blur-[1px] ring-1 ring-black/[0.02] dark:ring-white/[0.04]"
+                >
+                  <CardHeader className="border-b border-border/35 bg-gradient-to-r from-primary/[0.04] via-card to-accent/[0.03] px-6 py-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-xl font-display font-semibold tracking-tight mb-1.5">
+                          {goal.title}
+                        </CardTitle>
+                        {goal.description ? (
+                          <CardDescription className="text-[15px] leading-relaxed text-muted-foreground">
+                            {goal.description}
+                          </CardDescription>
+                        ) : null}
+                        <div className="flex items-center gap-3 mt-4 text-sm flex-wrap">
+                          <span className="inline-flex items-baseline gap-1.5 rounded-lg bg-muted/50 px-2.5 py-1 text-muted-foreground">
+                            <span className="text-[11px] uppercase tracking-wide">Target</span>
+                            <span className="font-semibold tabular-nums text-foreground">
+                              $
+                              {goal.target_amount ? parseFloat(goal.target_amount.toString()).toLocaleString() : "0"}
                             </span>
-                          )}
+                          </span>
+                          <span className="inline-flex items-baseline gap-1.5 rounded-lg bg-muted/50 px-2.5 py-1 text-muted-foreground">
+                            <span className="text-[11px] uppercase tracking-wide">Now</span>
+                            <span className="font-semibold tabular-nums text-foreground">
+                              $
+                              {goal.current_amount ? parseFloat(goal.current_amount.toString()).toLocaleString() : "0"}
+                            </span>
+                          </span>
+                          {goal.target_date ? (
+                            <span className="text-xs text-muted-foreground">
+                              By{" "}
+                              <span className="font-medium text-foreground">
+                                {new Date(goal.target_date).toLocaleDateString()}
+                              </span>
+                            </span>
+                          ) : null}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-4 shrink-0">
-                        <Badge variant="secondary">
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <Badge className="rounded-lg border-0 bg-primary/12 text-primary font-mono text-xs px-2.5 py-1">
                           {goal.progress.toFixed(0)}%
                         </Badge>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                           onClick={() => setGoalToDelete(goal)}
                           aria-label="Delete goal"
                         >
@@ -474,52 +566,56 @@ const Goals = () => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <Progress value={goal.progress} className="h-3" />
-                    
-                    {/* Milestones */}
-                    {goal.milestones.length > 0 && (
+                  <CardContent className="space-y-6 px-6 py-6">
+                    <Progress value={goal.progress} className="h-2 rounded-full bg-muted" />
+                    {goal.milestones.length > 0 ? (
                       <div className="space-y-4">
-                        <h4 className="font-semibold text-sm text-foreground">Milestones</h4>
-                        <div className="space-y-3 pl-4 border-l-2 border-primary/20">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          Milestones
+                        </h4>
+                        <div className="relative pl-6 space-y-0 border-l border-primary/25">
                           {goal.milestones.map((milestone, index) => (
                             <div
                               key={milestone.id}
-                              className={`relative pl-6 pb-4 ${
-                                index === goal.milestones.length - 1 ? 'pb-0' : ''
-                              }`}
+                              className={cn(
+                                "relative pb-5 pl-6",
+                                index === goal.milestones.length - 1 ? "pb-0" : "",
+                              )}
                             >
-                              <div className="absolute left-0 top-1 -translate-x-1/2">
+                              <div className="absolute -left-[25px] top-1.5 flex h-7 w-7 items-center justify-center rounded-xl border border-background bg-card shadow-sm">
                                 {milestone.completed ? (
-                                  <CheckCircle2 className="h-5 w-5 text-accent" />
+                                  <CheckCircle2 className="h-4 w-4 text-accent shrink-0" />
                                 ) : (
-                                  <Circle className="h-5 w-5 text-primary" />
+                                  <Circle className="h-4 w-4 text-primary/80 shrink-0" />
                                 )}
                               </div>
                               <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <h4 className={`font-medium text-sm ${
-                                    milestone.completed 
-                                      ? 'text-muted-foreground line-through' 
-                                      : 'text-foreground'
-                                  }`}>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span
+                                    className={cn(
+                                      "font-medium text-sm",
+                                      milestone.completed
+                                        ? "text-muted-foreground line-through decoration-border"
+                                        : "text-foreground",
+                                    )}
+                                  >
                                     {milestone.title}
-                                  </h4>
-                                  {milestone.financialTarget > 0 && (
-                                    <Badge variant="outline" className="text-xs">
+                                  </span>
+                                  {milestone.financialTarget > 0 ? (
+                                    <Badge variant="outline" className="text-[11px] rounded-md px-2 font-normal border-border/60">
                                       ${milestone.financialTarget.toLocaleString()}
                                     </Badge>
-                                  )}
+                                  ) : null}
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {milestone.description}
-                                </p>
+                                {milestone.description ? (
+                                  <p className="text-xs text-muted-foreground leading-relaxed">{milestone.description}</p>
+                                ) : null}
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
               ))}

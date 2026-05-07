@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
-
-const MARKET_API_BASE_URL =
-  import.meta.env.VITE_MARKET_API_BASE_URL ||
-  "https://8p52xermu7.execute-api.ca-west-1.amazonaws.com/v1";
-const MARKET_API_KEY =
-  import.meta.env.VITE_MARKET_API_KEY || import.meta.env.VITE_SERVING_API_KEY || "";
+import { marketGatewayFetch } from "@/lib/marketGateway";
 
 interface QuoteResponse {
   data: { close?: string | number };
@@ -53,19 +48,15 @@ const MarketIndexToday = () => {
     const controller = new AbortController();
 
     const load = async () => {
-      const headers: HeadersInit = {};
-      if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
-
       const next = await Promise.all(
         QUOTE_SPECS.map(async (spec) => {
           try {
             const [quoteRes, retRes] = await Promise.all([
-              fetch(`${MARKET_API_BASE_URL}/market/quote/${spec.symbol}`, {
-                headers,
+              marketGatewayFetch(`/market/quote/${spec.symbol}`, {
                 signal: controller.signal,
               }),
-              fetch(`${MARKET_API_BASE_URL}/market/returns/${spec.symbol}?horizons=1`, {
-                headers,
+              marketGatewayFetch(`/market/returns/${spec.symbol}`, {
+                searchParams: { horizons: "1" },
                 signal: controller.signal,
               }),
             ]);

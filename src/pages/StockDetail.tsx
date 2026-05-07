@@ -30,6 +30,7 @@ import {
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 import { checkSimilarRegrets } from "@/lib/regretUtils";
 import { fetchMassiveNewsForTicker, type NewsListItem } from "@/lib/massiveNews";
+import { marketGatewayFetch } from "@/lib/marketGateway";
 
 type TimePeriod = "1D" | "6M" | "YTD" | "1Y" | "5Y";
 type OhlcvInterval = "1d" | "1h" | "15m" | "5m" | "1m";
@@ -80,12 +81,6 @@ interface CorrelatedIndicator {
   price: number | null;
   change: number | null;
 }
-
-const MARKET_API_BASE_URL =
-  import.meta.env.VITE_MARKET_API_BASE_URL ||
-  "https://8p52xermu7.execute-api.ca-west-1.amazonaws.com/v1";
-const MARKET_API_KEY =
-  import.meta.env.VITE_MARKET_API_KEY || import.meta.env.VITE_SERVING_API_KEY || "";
 
 const CORRELATED_INDICATOR_SYMBOLS: Array<{ name: string; symbol: string }> = [
   { name: "S&P 500", symbol: "SPY" },
@@ -273,21 +268,22 @@ const StockDetail = () => {
       setMarketLoading(true);
       try {
         setUsingFallbackData(false);
-        const quoteUrl = `${MARKET_API_BASE_URL}/market/quote/${symbol.toUpperCase()}`;
         const ohlcvParams = mapPeriodToOhlcvParams(selectedPeriod);
-        const ohlcvUrl = new URL(`${MARKET_API_BASE_URL}/market/ohlcv/${symbol.toUpperCase()}`);
-        ohlcvUrl.searchParams.set("interval", ohlcvParams.interval);
-        ohlcvUrl.searchParams.set("start_date", ohlcvParams.startDate);
-        ohlcvUrl.searchParams.set("end_date", ohlcvParams.endDate);
-        ohlcvUrl.searchParams.set("limit", String(ohlcvParams.limit));
-        ohlcvUrl.searchParams.set("sort", "asc");
-
-        const headers: HeadersInit = {};
-        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
+        const ohlcvQs = new URLSearchParams();
+        ohlcvQs.set("interval", ohlcvParams.interval);
+        ohlcvQs.set("start_date", ohlcvParams.startDate);
+        ohlcvQs.set("end_date", ohlcvParams.endDate);
+        ohlcvQs.set("limit", String(ohlcvParams.limit));
+        ohlcvQs.set("sort", "asc");
 
         const [quoteRes, ohlcvRes] = await Promise.all([
-          fetch(quoteUrl, { headers, signal: controller.signal }),
-          fetch(ohlcvUrl.toString(), { headers, signal: controller.signal }),
+          marketGatewayFetch(`/market/quote/${symbol.toUpperCase()}`, {
+            signal: controller.signal,
+          }),
+          marketGatewayFetch(`/market/ohlcv/${symbol.toUpperCase()}`, {
+            searchParams: ohlcvQs,
+            signal: controller.signal,
+          }),
         ]);
 
         if (!quoteRes.ok) throw new Error(`Quote API failed (${quoteRes.status})`);
@@ -337,13 +333,10 @@ const StockDetail = () => {
     const controller = new AbortController();
     const fetchCorrelatedIndicators = async () => {
       try {
-        const headers: HeadersInit = {};
-        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
         const rows = await Promise.all(
           CORRELATED_INDICATOR_SYMBOLS.map(async ({ name, symbol: indexSymbol }) => {
             try {
-              const quoteRes = await fetch(`${MARKET_API_BASE_URL}/market/quote/${indexSymbol}`, {
-                headers,
+              const quoteRes = await marketGatewayFetch(`/market/quote/${indexSymbol}`, {
                 signal: controller.signal,
               });
 

@@ -42,6 +42,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { isOnboardingCompleteForUser } from '@/lib/purposeUtils';
+import { consecutiveJournalDays } from "@/lib/journalStreak";
+import { marketGatewayFetch } from "@/lib/marketGateway";
 import { useCooldown } from '@/hooks/useCooldown';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -81,12 +83,6 @@ interface TopPickRow {
   sincePickHorizonDays: number | null;
   rank: number | null;
 }
-
-const MARKET_API_BASE_URL =
-  import.meta.env.VITE_MARKET_API_BASE_URL ||
-  "https://8p52xermu7.execute-api.ca-west-1.amazonaws.com/v1";
-const MARKET_API_KEY =
-  import.meta.env.VITE_MARKET_API_KEY || import.meta.env.VITE_SERVING_API_KEY || "";
 
 const DASHBOARD_INDEX_SPECS: Array<{ name: string; symbol: string; isCurrency?: boolean }> = [
   { name: "S&P 500", symbol: "SPY" },
@@ -315,7 +311,12 @@ const UserDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [portfolioItems, setPortfolioItems] = useState<any[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
-  const [journalStats, setJournalStats] = useState({ totalEntries: 0, weekStreak: 0, avgMood: "Neutral" });
+  const [journalStats, setJournalStats] = useState({
+    totalEntries: 0,
+    streakDays: 0,
+    topMood: "—",
+  });
+  const [rewardProfile, setRewardProfile] = useState<{ points: number; level: number } | null>(null);
   const [topPicks, setTopPicks] = useState<TopPickRow[]>([]);
   const [topPicksLoading, setTopPicksLoading] = useState(false);
   const [pickSectorValue, setPickSectorValue] = useState(ALL_SECTORS_SENTINEL);
@@ -390,11 +391,39 @@ const UserDashboard = () => {
           .eq('user_id', user.id);
 
         if (!journalError && journalData) {
+          const moods = journalData.map((row) => row.mood).filter((m): m is string => Boolean(m && String(m).trim()));
+          const moodCounts: Record<string, number> = {};
+          moods.forEach((m) => {
+            moodCounts[m] = (moodCounts[m] ?? 0) + 1;
+          });
+          let topMood = "—";
+          let topN = 0;
+          Object.entries(moodCounts).forEach(([k, v]) => {
+            if (v > topN) {
+              topN = v;
+              topMood = k;
+            }
+          });
+
           setJournalStats({
             totalEntries: journalData.length,
-            weekStreak: Math.floor(journalData.length / 7),
-            avgMood: "Reflective"
+            streakDays: consecutiveJournalDays(journalData.map((j) => j.created_at)),
+            topMood: topMood,
           });
+        }
+
+        const { data: profileRow } = await supabase
+          .from("profiles")
+          .select("reward_points, reward_level")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profileRow) {
+          setRewardProfile({
+            points: Number(profileRow.reward_points ?? 0),
+            level: Number(profileRow.reward_level ?? 1),
+          });
+        } else {
+          setRewardProfile(null);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -410,19 +439,15 @@ const UserDashboard = () => {
     const controller = new AbortController();
     const fetchTopIndices = async () => {
       try {
-        const headers: HeadersInit = {};
-        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
-
         const rows = await Promise.all(
           DASHBOARD_INDEX_SPECS.map(async (spec) => {
             try {
               const [quoteRes, returnsRes] = await Promise.all([
-                fetch(`${MARKET_API_BASE_URL}/market/quote/${spec.symbol}`, {
-                  headers,
+                marketGatewayFetch(`/market/quote/${spec.symbol}`, {
                   signal: controller.signal,
                 }),
-                fetch(`${MARKET_API_BASE_URL}/market/returns/${spec.symbol}?horizons=1`, {
-                  headers,
+                marketGatewayFetch(`/market/returns/${spec.symbol}`, {
+                  searchParams: { horizons: "1" },
                   signal: controller.signal,
                 }),
               ]);
@@ -489,23 +514,19 @@ const UserDashboard = () => {
     const fetchTopPicks = async () => {
       setTopPicksLoading(true);
       try {
-        const headers: HeadersInit = {};
-        if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
-
         const scanYmd = pickScanDate.trim();
 
         if (scanYmd) {
           const targetTd = approxTradingDaysSinceScan(scanYmd);
           const horizons = buildHorizonsQuery(targetTd);
-          const url = new URL(`${MARKET_API_BASE_URL}/picks/${encodeURIComponent(scanYmd)}/returns`);
-          url.searchParams.set("horizons", horizons);
-          if (pickQuery.sector) url.searchParams.set("industry", pickQuery.sector);
-          if (pickQuery.minCap) url.searchParams.set("min_market_cap", pickQuery.minCap);
+          const pickSp: Record<string, string> = { horizons };
+          if (pickQuery.sector) pickSp.industry = pickQuery.sector;
+          if (pickQuery.minCap) pickSp.min_market_cap = pickQuery.minCap;
 
-          const res = await fetch(url.toString(), {
-            headers,
-            signal: controller.signal,
-          });
+          const res = await marketGatewayFetch(
+            `/picks/${encodeURIComponent(scanYmd)}/returns`,
+            { searchParams: pickSp, signal: controller.signal },
+          );
           if (!res.ok) {
             toast.error(`Could not load picks / returns for ${scanYmd} (${res.status}).`);
             setTopPicks([]);
@@ -547,13 +568,12 @@ const UserDashboard = () => {
           return;
         }
 
-        const url = new URL(`${MARKET_API_BASE_URL}/picks/today`);
-        url.searchParams.set("limit", "200");
-        if (pickQuery.sector) url.searchParams.set("industry", pickQuery.sector);
-        if (pickQuery.minCap) url.searchParams.set("min_market_cap", pickQuery.minCap);
+        const todaySp: Record<string, string> = { limit: "200" };
+        if (pickQuery.sector) todaySp.industry = pickQuery.sector;
+        if (pickQuery.minCap) todaySp.min_market_cap = pickQuery.minCap;
 
-        const picksRes = await fetch(url.toString(), {
-          headers,
+        const picksRes = await marketGatewayFetch("/picks/today", {
+          searchParams: todaySp,
           signal: controller.signal,
         });
         if (!picksRes.ok) throw new Error(`Top picks API failed (${picksRes.status})`);
@@ -568,8 +588,8 @@ const UserDashboard = () => {
           vegasRows.map(async (pick) => {
             const fallbackPrice = Number(pick.price);
             try {
-              const returnsRes = await fetch(`${MARKET_API_BASE_URL}/market/returns/${pick.symbol}?horizons=1`, {
-                headers,
+              const returnsRes = await marketGatewayFetch(`/market/returns/${pick.symbol}`, {
+                searchParams: { horizons: "1" },
                 signal: controller.signal,
               });
 
@@ -1152,19 +1172,26 @@ const UserDashboard = () => {
                   </div>
                   <Badge variant="outline" className="text-xs shrink-0 bg-accent/10 border-accent/25 text-accent">
                     <Calendar className="w-3 h-3 mr-1" />
-                    {journalStats.weekStreak} wk streak
+                    {journalStats.streakDays}d streak
                   </Badge>
                 </div>
-                <div className="grid grid-cols-2 gap-3 mb-6 flex-1 content-start">
+                <div className="grid grid-cols-2 gap-3 mb-4 flex-1 content-start">
                   <div className="rounded-xl border border-border/35 bg-background/60 p-4 text-center">
                     <div className="text-2xl font-bold text-foreground tabular-nums">{journalStats.totalEntries}</div>
                     <div className="text-[11px] text-muted-foreground mt-1">Entries</div>
                   </div>
                   <div className="rounded-xl border border-border/35 bg-background/60 p-4 text-center">
-                    <div className="text-lg font-semibold text-accent">{journalStats.avgMood}</div>
-                    <div className="text-[11px] text-muted-foreground mt-1">Mood</div>
+                    <div className="text-lg font-semibold text-accent line-clamp-2">{journalStats.topMood}</div>
+                    <div className="text-[11px] text-muted-foreground mt-1">Top mood</div>
                   </div>
                 </div>
+                {rewardProfile && (
+                  <div className="rounded-xl border border-primary/25 bg-primary/5 px-3 py-3 mb-4 text-xs text-muted-foreground">
+                    <span className="font-semibold text-primary">Tradlyte rewards</span> · Level {rewardProfile.level} ·{" "}
+                    <span className="tabular-nums text-foreground font-medium">{rewardProfile.points}</span> pts · journal +25 /
+                    new goal +50
+                  </div>
+                )}
                 <Link to="/journal">
                   <Button variant="outline" size="sm" className="w-full rounded-xl">
                     <Brain className="h-4 w-4 mr-2" />

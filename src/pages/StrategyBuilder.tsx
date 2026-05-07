@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { buildPrebuiltBacktestBody, getBackendStrategyName } from "@/lib/strategyBacktestPresets";
 import { normalizeBacktestResponse } from "@/lib/normalizeBacktestResponse";
 import { applyTimeframeToComponents, getRecipeById } from "@/lib/backtestRecipes";
+import { marketGatewayFetch } from "@/lib/marketGateway";
 
 export interface Condition {
   id: string;
@@ -32,12 +33,6 @@ export interface Condition {
   category: "entry" | "exit";
   parameters?: Record<string, any>;
 }
-
-const MARKET_API_BASE_URL =
-  import.meta.env.VITE_MARKET_API_BASE_URL ||
-  "https://8p52xermu7.execute-api.ca-west-1.amazonaws.com/v1";
-const MARKET_API_KEY =
-  import.meta.env.VITE_MARKET_API_KEY || import.meta.env.VITE_SERVING_API_KEY || "";
 
 function ymdDaysAgo(daysAgo: number): string {
   const d = new Date();
@@ -148,12 +143,9 @@ const StrategyBuilder = () => {
     setBenchmarkCurve(null);
 
     try {
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (MARKET_API_KEY) headers["x-api-key"] = MARKET_API_KEY;
-
-      const res = await fetch(`${MARKET_API_BASE_URL}/backtest`, {
+      const res = await marketGatewayFetch("/backtest", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
@@ -183,13 +175,15 @@ const StrategyBuilder = () => {
 
       if (normalized?.equity_curve?.length) {
         try {
-          const bmkUrl = new URL(`${MARKET_API_BASE_URL}/market/ohlcv/SPY`);
-          bmkUrl.searchParams.set("interval", "1d");
-          bmkUrl.searchParams.set("sort", "asc");
-          bmkUrl.searchParams.set("start_date", String(normalizedMeta.start_date));
-          bmkUrl.searchParams.set("end_date", String(normalizedMeta.end_date));
-          bmkUrl.searchParams.set("limit", "2000");
-          const bmkRes = await fetch(bmkUrl.toString(), { headers });
+          const bmkSp = new URLSearchParams();
+          bmkSp.set("interval", "1d");
+          bmkSp.set("sort", "asc");
+          bmkSp.set("start_date", String(normalizedMeta.start_date));
+          bmkSp.set("end_date", String(normalizedMeta.end_date));
+          bmkSp.set("limit", "2000");
+          const bmkRes = await marketGatewayFetch("/market/ohlcv/SPY", {
+            searchParams: bmkSp,
+          });
           if (bmkRes.ok) {
             const bmkJson = (await bmkRes.json()) as { data?: unknown };
             const closes = extractOhlcvCloseSeries(bmkJson.data);
