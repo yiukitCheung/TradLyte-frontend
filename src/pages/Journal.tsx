@@ -39,10 +39,6 @@ const MOODS = ["Reflective", "Calm", "Focused", "Motivated", "Anxious", "Neutral
 type ChatMsg = { role: "ai" | "user"; text: string };
 type MiniMaxMessage = { role: "user" | "assistant"; content: Array<{ type: "text"; text: string }> };
 
-const MINIMAX_BASE_URL = (import.meta.env.VITE_ANTHROPIC_BASE_URL as string | undefined)?.replace(/\/$/, "");
-const MINIMAX_API_KEY = import.meta.env.VITE_MINIMAX_KEY as string | undefined;
-const MINIMAX_MODEL = (import.meta.env.VITE_MINIMAX_MODEL as string | undefined) ?? "MiniMax-M2.7";
-
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{children}</p>;
 }
@@ -203,53 +199,20 @@ const Journal = () => {
         content: [{ type: "text", text: m.text }],
       }));
 
-  const parseMiniMaxText = (payload: unknown): string | null => {
-    if (!payload || typeof payload !== "object") return null;
-    const content = (payload as { content?: unknown }).content;
-    if (typeof content === "string") return content;
-    if (Array.isArray(content)) {
-      const textBlock = content.find(
-        (item) =>
-          item &&
-          typeof item === "object" &&
-          (item as { type?: string }).type === "text" &&
-          typeof (item as { text?: unknown }).text === "string",
-      ) as { text?: string } | undefined;
-      return textBlock?.text ?? null;
-    }
-    return null;
-  };
-
   const requestMiniMaxReply = async (nextHistory: ChatMsg[]): Promise<string> => {
-    if (!MINIMAX_BASE_URL || !MINIMAX_API_KEY) {
-      throw new Error("MiniMax env is missing. Please set VITE_ANTHROPIC_BASE_URL and VITE_MINIMAX_KEY.");
-    }
-
-    const response = await fetch(`${MINIMAX_BASE_URL}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": MINIMAX_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MINIMAX_MODEL,
-        max_tokens: 500,
-        system:
-          "You are Tradlyte AI, a concise journaling coach for traders. Keep responses practical, supportive, and brief (2-4 sentences).",
+    const { data, error } = await supabase.functions.invoke("ai-chat", {
+      body: {
         messages: toMiniMaxHistory(nextHistory),
-      }),
+      },
     });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`MiniMax request failed (${response.status}): ${errorBody || response.statusText}`);
+    if (error) {
+      const contextResponse = "context" in error ? ((error as { context?: unknown }).context as Response | undefined) : undefined;
+      const errText = contextResponse ? await contextResponse.text().catch(() => "") : "";
+      throw new Error(`MiniMax request failed: ${errText || error.message}`);
     }
-
-    const data = (await response.json()) as unknown;
-    const text = parseMiniMaxText(data);
+    const text = (data as { text?: unknown } | null)?.text;
     if (!text) throw new Error("MiniMax returned no text content.");
-    return text;
+    return String(text);
   };
 
   const handleSendChat = async () => {
