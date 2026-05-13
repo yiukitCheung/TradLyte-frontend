@@ -105,8 +105,13 @@ const PurposeOnboarding = () => {
       return;
     }
 
+    const primaryGoalLabel =
+      selectedGoal === 'other'
+        ? customGoal.trim()
+        : PURPOSE_OPTIONS.find((o) => o.id === selectedGoal)?.label ?? '';
+
     const purpose: UserPurpose = {
-      primaryGoal: selectedGoal === 'other' ? customGoal : PURPOSE_OPTIONS.find(o => o.id === selectedGoal)?.label || '',
+      primaryGoal: primaryGoalLabel,
       purposeStatement,
       onboardingComplete: true,
       supabaseUserId: user.id,
@@ -116,16 +121,45 @@ const PurposeOnboarding = () => {
 
     setIsFinishing(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: { onboarding_complete: true },
-      });
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: user.id,
+          full_name: (user.user_metadata?.full_name as string | undefined) ?? null,
+          primary_goal: primaryGoalLabel || null,
+          purpose_statement: purposeStatement.trim() || null,
+          investment_experience: investmentExperience || null,
+          time_horizon: timeHorizon || null,
+          risk_tolerance: riskTolerance || null,
+          onboarding_complete: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      );
 
-      if (error) {
-        toast.error(error.message || 'Could not save onboarding to your account. Please try again.');
+      if (profileError) {
+        toast.error(profileError.message || 'Could not save your purpose to your profile.');
         return;
       }
 
-      toast.success('Welcome to TradLyte! Let\'s build wealth with purpose.');
+      const trimmedAmount = firstGoalAmount.trim();
+      const parsedAmount = trimmedAmount ? Number(trimmedAmount) : null;
+      const { error: goalError } = await supabase.from('user_goals').insert({
+        user_id: user.id,
+        title: firstGoalTitle.trim(),
+        target_amount: parsedAmount && Number.isFinite(parsedAmount) ? parsedAmount : null,
+      });
+      if (goalError) {
+        console.warn('[onboarding] could not insert first goal:', goalError.message);
+      }
+
+      const { error: metaError } = await supabase.auth.updateUser({
+        data: { onboarding_complete: true },
+      });
+      if (metaError) {
+        console.warn('[onboarding] could not mirror flag in user_metadata:', metaError.message);
+      }
+
+      toast.success("Welcome to TradLyte! Let's build wealth with purpose.");
       navigate('/dashboard');
     } finally {
       setIsFinishing(false);

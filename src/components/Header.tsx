@@ -1,13 +1,29 @@
-import { Search, TrendingUp, User } from "lucide-react";
+import { LogOut, Search, Settings, TrendingUp, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 /** DESIGN.md §4 Nav — floating white pill, soft elevation, airy link spacing */
 const Header = () => {
   const { user, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
+
+  const initial = (() => {
+    const name =
+      (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "";
+    const trimmed = name.trim();
+    return trimmed ? trimmed.charAt(0).toUpperCase() : "T";
+  })();
 
   const loggedInLinks = (
     <>
@@ -69,17 +85,41 @@ const Header = () => {
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {user ? (
-              <>
-                <Link to="/dashboard" className="hidden xl:inline-flex">
-                  <Button variant="ghost" size="sm" className="rounded-full px-5 gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-11 items-center gap-2 rounded-full border border-foreground/[0.12] bg-transparent px-3 text-foreground hover:bg-accent/70 transition-colors"
+                    aria-label="Open account menu"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                      {initial}
+                    </span>
+                    <span className="hidden sm:inline text-sm font-medium pr-1">
+                      Account
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground truncate">
+                    {user.email}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/dashboard")} className="gap-2 cursor-pointer">
                     <User className="h-4 w-4" />
                     Dashboard
-                  </Button>
-                </Link>
-                <Button type="button" variant="outline" size="sm" className="rounded-full px-6" onClick={() => signOut()}>
-                  Sign out
-                </Button>
-              </>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/profile")} className="gap-2 cursor-pointer">
+                    <Settings className="h-4 w-4" />
+                    Profile & settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => signOut()} className="gap-2 cursor-pointer text-rose-600 focus:text-rose-700">
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Link to="/auth">
                 <Button variant="default" size="sm">

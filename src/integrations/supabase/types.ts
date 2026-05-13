@@ -80,6 +80,12 @@ export type Database = {
           email?: string | null
           reward_level: number
           reward_points: number
+          onboarding_complete: boolean
+          primary_goal: string | null
+          purpose_statement: string | null
+          investment_experience: string | null
+          time_horizon: string | null
+          risk_tolerance: string | null
         }
         Insert: {
           created_at?: string | null
@@ -89,6 +95,12 @@ export type Database = {
           email?: string | null
           reward_level?: number
           reward_points?: number
+          onboarding_complete?: boolean
+          primary_goal?: string | null
+          purpose_statement?: string | null
+          investment_experience?: string | null
+          time_horizon?: string | null
+          risk_tolerance?: string | null
         }
         Update: {
           created_at?: string | null
@@ -98,6 +110,12 @@ export type Database = {
           email?: string | null
           reward_level?: number
           reward_points?: number
+          onboarding_complete?: boolean
+          primary_goal?: string | null
+          purpose_statement?: string | null
+          investment_experience?: string | null
+          time_horizon?: string | null
+          risk_tolerance?: string | null
         }
         Relationships: []
       }

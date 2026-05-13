@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
 import UserDashboard from "./pages/UserDashboard";
 import StrategyBuilder from "./pages/StrategyBuilder";
 import Goals from "./pages/Goals";
@@ -24,6 +27,9 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/onboarding" element={<PurposeOnboarding />} />
           <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/strategy-builder" element={<StrategyBuilder />} />

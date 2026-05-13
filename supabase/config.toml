@@ -16,3 +16,6 @@ entrypoint = "./functions/polygon-news/index.ts"
 
 [functions.ai-chat]
 verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
