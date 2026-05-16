@@ -80,9 +80,9 @@ const Footer = () => {
             <h3 className={colHeader}>Company</h3>
             <ul className="space-y-2.5">
               <li>
-                <a href="#" className={linkClasses}>
+                <Link to="/about" className={linkClasses}>
                   About
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="#" className={linkClasses}>

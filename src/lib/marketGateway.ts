@@ -47,15 +47,17 @@ export async function marketGatewayFetch(
     });
   }
 
+  // Use the user's session token when signed in; otherwise fall back to the
+  // public anon key. The Edge Function only needs a valid JWT to satisfy
+  // `verify_jwt = true` — it does not key any logic off the caller's identity,
+  // so anonymous visitors can still load market data (search, quotes, charts).
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error("Sign in required for market data");
-  }
+  const bearer = session?.access_token ?? SUPABASE_ANON;
 
   const headers = new Headers(hdrInit);
-  headers.set("Authorization", `Bearer ${session.access_token}`);
+  headers.set("Authorization", `Bearer ${bearer}`);
   headers.set("apikey", SUPABASE_ANON);
 
   return fetch(u.toString(), {

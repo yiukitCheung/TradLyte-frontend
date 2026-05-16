@@ -25,36 +25,45 @@ const Header = () => {
     return trimmed ? trimmed.charAt(0).toUpperCase() : "T";
   })();
 
+  const navLinkClass =
+    "whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors";
+
   const loggedInLinks = (
     <>
-      <Link to="/dashboard" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/dashboard" className={navLinkClass}>
         Dashboard
       </Link>
-      <Link to="/strategy-builder" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/strategy-builder" className={navLinkClass}>
         Strategy Builder
       </Link>
-      <Link to="/goals" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/goals" className={navLinkClass}>
         Goals
       </Link>
-      <Link to="/journal" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/journal" className={navLinkClass}>
         Journal
+      </Link>
+      <Link to="/about" className={navLinkClass}>
+        About
       </Link>
     </>
   );
 
   const guestLinks = (
     <>
-      <Link to="/auth" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/auth" className={navLinkClass}>
         Dashboard
       </Link>
-      <Link to="/auth" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/auth" className={navLinkClass}>
         Strategy Builder
       </Link>
-      <Link to="/auth" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/auth" className={navLinkClass}>
         Goals
       </Link>
-      <Link to="/auth" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+      <Link to="/auth" className={navLinkClass}>
         Journal
+      </Link>
+      <Link to="/about" className={navLinkClass}>
+        About
       </Link>
     </>
   );
@@ -73,13 +82,17 @@ const Header = () => {
           <nav className="hidden md:flex flex-1 min-w-0 justify-center items-center gap-8 xl:gap-14 flex-wrap px-2 lg:px-8">
             {isHomePage ? (
               <>
-                <a href="#market" className="whitespace-nowrap text-base font-medium text-foreground tracking-tight hover:text-muted-foreground transition-colors">
+                <a href="#market" className={navLinkClass}>
                   Market
                 </a>
                 {user ? loggedInLinks : guestLinks}
               </>
+            ) : user ? (
+              loggedInLinks
             ) : (
-              user && loggedInLinks
+              <Link to="/about" className={navLinkClass}>
+                About
+              </Link>
             )}
           </nav>
 

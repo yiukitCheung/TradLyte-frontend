@@ -13,6 +13,7 @@ import StrategyBuilder from "./pages/StrategyBuilder";
 import Goals from "./pages/Goals";
 import Journal from "./pages/Journal";
 import StockDetail from "./pages/StockDetail";
+import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 import PurposeOnboarding from "./components/onboarding/PurposeOnboarding";
 
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/goals" element={<Goals />} />
           <Route path="/journal" element={<Journal />} />
           <Route path="/stock/:symbol" element={<StockDetail />} />
+          <Route path="/about" element={<About />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
